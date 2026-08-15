@@ -114,19 +114,6 @@ body { display: flex; flex-direction: column; }
 @media (max-width: 720px) { .brand .cn { display: none; } }
 @media (max-width: 520px) { .brand .wm { display: none; } }
 
-/* 設定頁最上面的識別區：第一次打開的人先看到這個 */
-.hero { padding: 4px 0 22px; margin-bottom: 22px;
-        border-bottom: 2px solid var(--line-hard); }
-.hero .lock { display: block; width: min(420px, 78%); aspect-ratio: 1317 / 593;
-              background: url(../assets/lockup.png) left center/contain no-repeat; }
-:root[data-theme="light"] .hero .lock { background-image: url(../assets/lockup-light.png); }
-.hero .motto { margin-top: 16px; font-size: clamp(17px, 2.6vw, 22px);
-               font-weight: 900; letter-spacing: .01em; line-height: 1.35; }
-.hero .motto b { font-weight: 900;
-  background: var(--grad); -webkit-background-clip: text; background-clip: text;
-  color: transparent; }
-.hero .motto span { display: block; font-family: var(--f-mono); font-size: 11px;
-  letter-spacing: .34em; color: var(--label-fg); margin-top: 8px; font-weight: 400; }
 .evt { flex: 1; min-width: 0; font-size: 14px; color: var(--dim);
        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .clock { font-family: var(--f-mono); font-size: 15px; color: var(--dim); }
