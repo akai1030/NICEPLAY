@@ -45,6 +45,7 @@ function blank() {
     players: [],
     matches: [],
     timer: { running: false, endsAt: 0, remainMs: 0, durMs: 0, round: null },
+    theme: 'dark',              /* dark | light，全域，兩個視窗共用 */
     phase: 'setup',             /* setup | running | done */
     rev: 0
   };

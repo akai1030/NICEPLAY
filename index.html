@@ -16,7 +16,8 @@
   <div class="brand">NICEPLAY<span> ／ 賽事台</span></div>
   <div class="evt" id="evtLabel">尚未設定賽事</div>
   <div class="clock num" id="wallClock">--:--</div>
-  <button class="sm main" id="btnPresent">放大投影</button>
+  <button class="sm" id="btnTheme" title="切換淺色／深色">◐</button>
+  <button class="sm main" id="btnPresent">放大投影 ↗</button>
 </header>
 
 <nav class="tabs">
@@ -39,8 +40,12 @@
   <h2 class="sec sec-gap">Players<em>參賽名單</em></h2>
   <textarea id="fPlayers" placeholder="一行一位選手，前面可以有編號也可以沒有：&#10;1 王小明&#10;2 陳小美&#10;林阿明"></textarea>
   <div class="row" style="margin-top:8px">
-    <button class="sm" id="btnParse">讀入名單</button>
+    <button class="sm go" id="btnParse">更新名單</button>
     <span class="hint" id="playerMsg" style="margin:0"></span>
+  </div>
+  <div class="hint" style="margin-top:2px">
+    這個框永遠是<b>完整名單</b>。要加人就在最後補一行再按一次；
+    比賽開始後加人只會新增，不會動到已經打完的成績（要移除請用排名頁的「退賽」）。
   </div>
   <div class="roster" id="rosterView" style="margin-top:10px"></div>
 
@@ -147,7 +152,9 @@
   <div class="pv-ft">
     <span class="k">NICEPLAY</span>
     <span class="grow" id="pvFoot"></span>
-    <span class="exit">按 Esc 離開投影　·　按 1 對戰表　2 名次</span>
+    <span class="exit">點畫面切換對戰表／名次　·　1 2 F Esc</span>
+    <button class="sm" id="btnFull">全螢幕</button>
+    <button class="sm" id="btnClosePv">關閉投影窗</button>
   </div>
 </div>
 

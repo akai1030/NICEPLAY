@@ -132,15 +132,58 @@ function updateTableHint(st) {
     '目前設定 <b>' + count + '</b> 桌：' + esc(head);
 }
 
-/* ── 名單 ───────────────────────────────────────────── */
+/* ── 名單 ─────────────────────────────────────────────
+   文字框永遠等於完整名單：按「更新名單」會把它正規化後寫回去，
+   所以要加人只要在最後補一行再按一次，原本的人不會被洗掉。
+   比賽開始後只做「新增」，不會刪人 —— 要移除請用退賽，
+   不然已經打完的場次會對不到人。                          */
+function syncPlayerBox(st) {
+  var box = el('fPlayers');
+  if (document.activeElement === box) return;      /* 正在打字就別動它 */
+  var list = drafting || st.players;
+  box.value = list.map(function (p) { return p.no + ' ' + p.name; }).join('\n');
+}
+
 el('btnParse').onclick = function () {
-  var list = S.parsePlayers(el('fPlayers').value);
-  if (!list.length) { toast('看不出名字，一行一位試試', true); return; }
-  drafting = list;
-  paintRoster(list);
-  el('playerMsg').innerHTML = '<span class="ok">讀到 ' + list.length + ' 位</span>';
-  if (el('fFormat').value === 'swiss') el('fRounds').value = E.suggestRounds(list.length);
-  updateTableHint();
+  var typed = S.parsePlayers(el('fPlayers').value);
+  if (!typed.length) { toast('看不出名字，一行一位試試', true); return; }
+  var st = store.get();
+
+  if (!st.matches.length) {
+    /* 還沒開賽：整份取代，編號重排 */
+    drafting = typed.map(function (p, i) {
+      return { id: p.id, no: i + 1, name: p.name, dropped: false };
+    });
+    paintRoster(drafting);
+    syncPlayerBox(st);
+    el('playerMsg').innerHTML = '<span class="ok">名單共 ' + drafting.length + ' 位</span>';
+    if (el('fFormat').value === 'swiss') el('fRounds').value = E.suggestRounds(drafting.length);
+    updateTableHint();
+    return;
+  }
+
+  /* 比賽中：比對名字，只加新的，舊的保留原本的 id 與成績 */
+  var byName = {};
+  st.players.forEach(function (p) { byName[p.name] = p; });
+  var added = [], missing = [];
+  typed.forEach(function (p) { if (!byName[p.name]) added.push(p.name); });
+  var typedNames = {};
+  typed.forEach(function (p) { typedNames[p.name] = 1; });
+  st.players.forEach(function (p) { if (!typedNames[p.name]) missing.push(p.name); });
+
+  if (!added.length) {
+    toast(missing.length ? '沒有新的人。要移除請用排名頁的「退賽」' : '名單沒有變動',
+          missing.length > 0);
+    syncPlayerBox(st);
+    return;
+  }
+  store.commit(function (s) {
+    added.forEach(function (nm) {
+      s.players.push({ id: S.uid(), no: s.players.length + 1, name: nm, dropped: false });
+    });
+  });
+  toast('已加入 ' + added.length + ' 位：' + added.join('、') +
+        (missing.length ? '（' + missing.join('、') + ' 未移除，請用退賽）' : ''));
 };
 
 function paintRoster(list) {
@@ -311,30 +354,85 @@ el('btnPrint').onclick = function () {
     el('tRank').classList.remove('print-me'); }, 500); }, 60);
 };
 
-/* ── 投影模式 ───────────────────────────────────────── */
-function setPresent(on) {
+/* ── 主題 ─────────────────────────────────────────────
+   存在 state 裡而不是各自的 localStorage —— 這樣控制台切換，
+   投影視窗會透過 BroadcastChannel 一起變，不用兩邊各按一次。 */
+function applyTheme(st) {
+  var t = st.theme === 'light' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  el('btnTheme').textContent = t === 'light' ? '☀' : '◐';
+  el('btnTheme').title = t === 'light' ? '目前淺色，點一下換深色' : '目前深色，點一下換淺色';
+  var meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.setAttribute('content', t === 'light' ? '#F4F5F7' : '#000000');
+}
+el('btnTheme').onclick = function () {
+  store.commit(function (s) { s.theme = (s.theme === 'light') ? 'dark' : 'light'; });
+};
+
+/* ── 投影模式 ─────────────────────────────────────────
+   「放大投影」開一個新視窗，原本這個分頁繼續當控制台。
+   兩邊靠 BroadcastChannel 同步，不需要伺服器。
+   把新視窗拖到接電視的那個顯示器、按全螢幕就完成了。      */
+var isPopup = false;           /* 這個視窗是被控制台開出來的投影窗 */
+
+function enterPresent(on) {
   document.body.classList.toggle('present', on);
-  if (on && document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen().catch(function () {});
-  } else if (!on && document.fullscreenElement && document.exitFullscreen) {
-    document.exitFullscreen().catch(function () {});
-  }
-  if (on) location.hash = 'present'; else if (location.hash === '#present') history.replaceState(null, '', location.pathname);
+  if (on) location.hash = 'present';
+  else if (location.hash === '#present') history.replaceState(null, '', location.pathname);
   render(store.get());
 }
-el('btnPresent').onclick = function () { setPresent(true); };
+
+el('btnPresent').onclick = function () {
+  var w = null;
+  try {
+    /* 具名視窗：重複按不會一直開新的，會把原本那個帶到前面 */
+    w = window.open(location.pathname + '#present', 'niceplay-present');
+  } catch (e) { w = null; }
+
+  if (w) {
+    try { w.focus(); } catch (e) {}
+    toast('投影視窗已開啟 —— 把它拖到投影機那個螢幕，再按視窗裡的「全螢幕」');
+  } else {
+    /* 被擋掉就退回原本的同視窗放大，至少不會卡住 */
+    enterPresent(true);
+    toast('瀏覽器擋掉了新視窗，改成在這個分頁放大。按 Esc 回到控制台', true);
+  }
+};
+
+el('btnFull').onclick = function () {
+  var d = document.documentElement;
+  if (document.fullscreenElement) {
+    if (document.exitFullscreen) document.exitFullscreen().catch(function () {});
+  } else if (d.requestFullscreen) {
+    d.requestFullscreen().catch(function () {});
+  }
+};
+
+el('btnClosePv').onclick = function () {
+  if (isPopup) window.close();
+  else enterPresent(false);
+};
+
 addEventListener('keydown', function (e) {
-  if (e.key === 'Escape' && document.body.classList.contains('present')) setPresent(false);
   if (!document.body.classList.contains('present')) return;
+  if (e.key === 'Escape') { el('btnClosePv').onclick(); return; }
   if (e.key === '1') { pvMode = 'matches'; render(store.get()); }
   if (e.key === '2') { pvMode = 'rank'; render(store.get()); }
+  if (e.key === 'f' || e.key === 'F') el('btnFull').onclick();
 });
-el('present').addEventListener('click', function (e) {
-  if (e.target.closest('.pv-ft')) return;
+
+/* 點畫面中央切換「對戰表 ⇄ 名次」，點頁尾的按鈕不算 */
+el('pvBody').addEventListener('click', function () {
   pvMode = (pvMode === 'matches') ? 'rank' : 'matches';
   render(store.get());
 });
-if (location.hash === '#present') setPresent(true);
+
+if (location.hash === '#present') {
+  isPopup = !!window.opener;
+  enterPresent(true);
+  document.title = 'NICEPLAY · 投影';
+  el('btnClosePv').textContent = isPopup ? '關閉投影窗' : '回到控制台';
+}
 
 /* ── 畫面 ───────────────────────────────────────────── */
 function render(st) {
@@ -347,10 +445,12 @@ function render(st) {
   el('tabRank').disabled = !st.players.length;
 
   if (!drafting) paintRoster(st.players);
+  syncPlayerBox(st);
   el('hintWin').textContent = st.config.rules.win;
   el('hintDraw').textContent = st.config.rules.draw;
   el('hintLoss').textContent = st.config.rules.loss;
 
+  applyTheme(st);
   paintMatches(st);
   paintRank(st);
   if (document.body.classList.contains('present')) paintPresent(st);
