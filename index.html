@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608160237">
+<link rel="stylesheet" href="src/style.css?v=202608160320">
 </head>
 <body>
 
@@ -112,7 +112,7 @@
 
   <h2 class="sec sec-gap">Devices<em>多裝置 · 手機遙控</em></h2>
   <div class="hint" style="margin-top:0">
-    不開房也能辦完整場比賽 —— 這一區只在你要<b>讓店員用手機幫忙回報</b>、
+    不開房也能辦完整場比賽 —— 這一區只在你要<b>讓副控用手機幫忙回報</b>、
     或<b>讓選手自己查桌號</b>時才需要。按下去會產生兩條連結，貼到群組就好，
     對方不用打任何東西。
   </div>
@@ -125,7 +125,7 @@
 
   <div id="netOn" hidden>
     <div class="lk staff">
-      <span class="lab">給店員　網址 ＋ 密碼，兩個都給他</span>
+      <span class="lab">給副控　網址 ＋ 密碼，兩個都給他</span>
       <div class="lkrow">
         <input type="text" id="urlStaff" readonly>
         <button class="sm main" data-copy="urlStaff">複製網址</button>
@@ -137,14 +137,25 @@
       <span class="sub">他打開網址、輸入密碼，就能幫忙點誰贏誰輸。密碼別給選手。</span>
     </div>
     <div class="lk view">
-      <span class="lab">給選手　讓他們掃投影畫面上的 QR</span>
-      <div class="lkrow">
-        <button class="sm main" id="btnQR" style="flex:1 1 auto">放大 QR 給全場掃</button>
-        <button class="sm" data-copy="urlView">複製連結</button>
+      <span class="lab">給選手　讓他們掃這個</span>
+      <div class="lkbody">
+        <div class="lkqr" id="sideQR" hidden>
+          <div class="lkqr-img" id="sideQRImg"></div>
+        </div>
+        <div class="lkside">
+          <span class="sub">
+            這個 QR <b>投影畫面右下角也會一直有一個</b>，選手隨時都能掃。
+            開場想投一個大的，按下面那顆。<br>
+            掃進去只能看自己在第幾桌、第幾名，改不了任何東西。
+          </span>
+          <div class="lkrow" style="margin-top:10px">
+            <button class="sm main" id="btnQR" style="flex:1 1 auto">放大給全場掃</button>
+            <button class="sm" data-copy="urlView">複製連結</button>
+          </div>
+          <div class="lkurl num" id="sideQRUrl"></div>
+        </div>
       </div>
       <input type="text" id="urlView" readonly hidden>
-      <span class="sub">投影畫面右下角也會一直有一個小的，隨時都能掃。
-        掃進去只能看自己在第幾桌、第幾名，改不了任何東西。</span>
     </div>
     <div class="row" style="margin-top:12px">
       <div class="hint" style="flex:1 1 230px;margin:0" id="roomHint"></div>
@@ -153,7 +164,7 @@
     <details class="adv">
       <summary>進階：房號與伺服器位址</summary>
       <div class="row" style="margin-top:10px">
-        <label class="fld"><span>店員房號</span>
+        <label class="fld"><span>副控密碼</span>
           <input type="text" id="roomCode" readonly></label>
         <label class="fld"><span>選手查詢碼</span>
           <input type="text" id="viewCode" readonly></label>
@@ -223,8 +234,8 @@
   </div>
 </div></div>
 
-<!-- ── 店員加入 ─────────────────────────────────────────
-     店員拿到的是一條乾淨的網址，密碼另外給。密碼不寫在網址裡 ——
+<!-- ── 副控加入 ─────────────────────────────────────────
+     副控拿到的是一條乾淨的網址，密碼另外給。密碼不寫在網址裡 ——
      網址會在群組裡被轉來轉去，密碼才是真正的權限。 -->
 <div id="staff">
   <div class="st-card">
@@ -235,7 +246,7 @@
            autocomplete="off" autocapitalize="characters">
     <button class="go big" id="btnStJoin">進去</button>
     <div class="hint" id="stMsg"></div>
-    <button class="sm" id="btnStBack">我不是店員，回主畫面</button>
+    <button class="sm" id="btnStBack">我不是副控，回主畫面</button>
   </div>
 </div>
 
@@ -329,30 +340,62 @@
   </div>
 
   <div class="bk-body" id="bookBody"><div class="wrap">
+  <div class="bk-body" id="bookBody"><div class="wrap">
+
+  <div class="bk-hero">
+    <i class="lock"></i>
+    <div class="bk-motto">
+      Every Match <b>Connects.</b> Every Play <b>Counts.</b>
+      <span>CONNECT · COMPETE · PLAY</span>
+    </div>
+    <p class="bk-manifesto">
+      每一場對局都會接上下一場，每一次出手都算進最後的名次。<br>
+      <b>NICEPLAY</b> 把一場實體賽事看成一張網 ——
+      選手是<b>節點</b>，對戰是<b>連線</b>，賽程樹是這張網長出來的形狀。
+      系統要做的事只有一件：讓這張網從第一輪一路長到冠亞軍，中間不斷、不歪、不用你算。
+    </p>
+    <div class="bk-name">
+      <span class="bk-en">NICEPLAY</span>
+      <span class="bk-full">Networked Integrated Competition &amp; Event Platform for League And Yomi</span>
+      <span class="bk-cn">連線整合賽事次世代系統</span>
+    </div>
+    <div class="bk-decode">
+      <span><b>N</b>etworked　連線</span><span><b>I</b>ntegrated　整合</span>
+      <span><b>C</b>ompetition　競技</span><span><b>E</b>vent　賽事</span>
+      <span><b>P</b>latform　平臺</span><span><b>L</b>eague　聯賽</span>
+      <span><b>A</b>nd　與</span><span><b>Y</b>omi　讀心</span>
+    </div>
+    <p class="bk-yomi">
+      <b>Yomi（読み）</b>是格鬥與卡牌圈講的「讀」——
+      讀對手的下一步、讀場上的分差、讀這一輪該不該冒險。
+      機器算得出誰跟誰打，算不出這個。<b>那部分留給坐在桌前的人。</b>
+    </p>
+  </div>
 
   <p class="bk-lede">
-    NICEPLAY 是跟著比賽跑的現場工具。<b>它幫你排對戰、算名次、還能投影給全場看</b>，
+    講白一點：NICEPLAY 是跟著比賽跑的現場工具。<b>它幫你排對戰、算名次、投影給全場看</b>，
     你只要把名單貼進去，之後每一輪點誰贏、再按「下一輪」。<br>
     沒有帳號、不用安裝、<b>斷網也能跑完整場</b> —— 資料就存在這臺電腦的瀏覽器裡。
   </p>
 
   <div class="bk-who">
     <div class="bk-card a"><span class="lab">Main</span>
-      <b>主控（你的筆電）</b>
+      <b>主控 —— 你的筆電</b>
       <span>輸名單、按下一輪、控制投影。整場比賽只需要這一臺。</span></div>
-    <div class="bk-card b"><span class="lab">Staff</span>
-      <b>店員的手機（選配）</b>
-      <span>你給他一條網址跟一組密碼，他就能幫忙點誰贏誰輸。</span></div>
+    <div class="bk-card b"><span class="lab">Sub</span>
+      <b>副控 —— 幫手的手機（選配）</b>
+      <span>你給他一條網址跟一組密碼，他就能幫忙點誰贏誰輸。改不到設定。</span></div>
     <div class="bk-card c"><span class="lab">Player</span>
       <b>選手的手機（選配）</b>
-      <span>掃投影畫面上的 QR，看自己在第幾桌、第幾名。什麼都不用打。</span></div>
+      <span>掃 QR，看自己在第幾桌、第幾名。什麼都不用打，也改不了任何東西。</span></div>
   </div>
 
   <div class="bk-step"><div class="no">1</div><div>
     <h3>把網址打開</h3>
-    <p><span class="key">niceplay.transtation.org</span> —— 用 Chrome 或 Safari 都可以，不用安裝任何東西。</p>
+    <p><span class="key">niceplay.transtation.org</span> —— Chrome 或 Safari 都可以，不用安裝任何東西。</p>
     <p>建議比賽前一天先開一次。手機可以按瀏覽器的「加到主畫面」，下次就像一個 App。</p>
-    <div class="bk-note"><b>現場斷網沒關係。</b>只要這臺電腦開過一次，之後沒網路也打得開，整場比賽都跑得完。</div>
+    <div class="bk-note"><b>現場斷網沒關係。</b>只要這臺電腦開過一次，之後沒網路也打得開，
+      整場比賽都跑得完 —— 只有「副控幫忙回報」與「選手查桌號」需要網路。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">2</div><div>
@@ -370,7 +413,7 @@
       <li><b>單敗淘汰</b> —— 輸一場就結束。</li>
       <li><b>循環賽</b> —— 每個人都打過一次，適合小人數。</li>
     </ul>
-    <p><b>輪數</b>留白會自動建議（8 人打3 輪、16 人打4 輪、32 人打5 輪）。
+    <p><b>輪數</b>留白會自動建議（8 人 3 輪、16 人 4 輪、32 人 5 輪）。
        <b>桌號</b>可以是數字、字母，或自己打（例如 Q1, Q2）。
        <b>主桌／直播桌</b>填了之後，那一桌在投影畫面會被框起來。</p>
     <p><b>每輪分鐘</b>填 0 就不計時。實體卡牌賽常見是 25 分鐘。</p>
@@ -379,13 +422,17 @@
   <div class="bk-step"><div class="no">4</div><div>
     <h3>按「開始比賽」</h3>
     <p>系統會直接排好第一輪，自動跳到「對戰」頁。把桌號念出來，或直接投影。</p>
+    <div class="bk-note">分頁是空的？點進去它會告訴你差什麼、按哪裡補 —— 不用猜。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">5</div><div>
     <h3>投影給全場看</h3>
     <p>右上角按 <span class="key">放大投影 ↗</span>，會開<b>新的一個視窗</b>，把它拖到投影機那一幕，再按「全螢幕」。</p>
     <p><b>原本那個視窗不會變</b>，你繼續在上面操作，投影那邊會跟著同步。</p>
-    <p>投影畫面上：<span class="key">1</span> 對戰表、<span class="key">2</span> 即時名次、<span class="key">F</span> 全螢幕、<span class="key">Esc</span> 退出；點畫面也可以切。</p>
+    <p>投影畫面上：<span class="key">1</span> 對戰表、<span class="key">2</span> 即時名次、
+       <span class="key">F</span> 全螢幕、<span class="key">Esc</span> 離開全螢幕；點畫面也可以切。</p>
+    <div class="bk-note warn"><b>Esc 只會離開全螢幕，不會關掉投影。</b>
+      要關請按頁尾的「關閉投影窗」，而且要按兩次 —— 比賽中誤按會讓全場瞬間沒畫面。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">6</div><div>
@@ -401,27 +448,30 @@
 
   <div class="bk-step"><div class="no">7</div><div>
     <h3>開房（選配，但很值得）</h3>
-    <p>設定頁最下面按 <span class="key">開房，產生連結</span>。伺服器位址已經填好，不用打。
-       開完會給你兩樣東西 —— 一樣給店員，一樣給選手。</p>
+    <p>設定頁最下面按 <span class="key">開房，產生連結</span>。伺服器位址已經填好，不用打。</p>
+    <p>開完會給你兩樣東西：<b>一條網址加一組密碼</b>（給副控），還有<b>一個 QR</b>（給選手）。
+       下面兩項分別說。</p>
   </div></div>
 
   <div class="bk-step"><div class="no">8</div><div>
-    <h3>給店員：一條網址 ＋ 一組密碼</h3>
+    <h3>給副控：一條網址 ＋ 一組密碼</h3>
     <p>按「複製網址」貼到群組，再按「複製密碼」把六碼傳給他。
        他打開網址會看到<b>只有一個輸入框的畫面</b>，密碼輸進去就能幫忙點誰贏誰輸了。</p>
     <div class="bk-note warn"><b>密碼不要給選手。</b>網址在群組裡會被轉來轉去，
       密碼才是真正的權限 —— 所以密碼不寫在網址裡。<br>
-      另外，<b>排對戰、按下一輪永遠只在你這臺</b>，店員改不到設定。</div>
+      <b>排對戰、按下一輪永遠只在你這臺。</b>副控看不到設定頁，改不到任何設定。</div>
+    <div class="bk-note"><b>同一臺電腦也可以同時開主控跟副控</b>（例如你想用另一個分頁測看看）——
+      身分是跟著<b>分頁</b>走的，不是跟著電腦。分頁關掉身分就沒了，重整則還在。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">9</div><div>
-    <h3>給選手：讓他們掃投影畫面上的 QR</h3>
-    <p>開房之後，<b>投影畫面右下角會一直有一個 QR</b>，全場隨時可以掃。
-       開場的時候可以按設定頁的 <span class="key">放大 QR 給全場掃</span>，投一個大的出來。</p>
+    <h3>給選手：讓他們掃 QR</h3>
+    <p>開房之後 QR 就直接畫在設定頁「給選手」那一格，<b>投影畫面右下角也會一直有一個</b>，
+       全場隨時可以掃。開場想投一個大的，按 <span class="key">放大給全場掃</span>。</p>
     <p>選手掃進去、點一下自己的名字，畫面就直接寫<b>「你在第 3 桌」</b>、
        對手是誰、目前第幾名。之後每一輪自動更新，不用重掃。</p>
     <div class="bk-note"><b>選手那條只能看。</b>就算有人想動手腳，伺服器也會直接擋下來 ——
-      可以放心把 QR 投在牆上。</div>
+      可以放心把 QR 投在牆上、貼在門口。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">10</div><div>
@@ -430,8 +480,9 @@
       <li><b>排錯了、有人臨時跑掉</b> → 對戰頁按「重排這一輪」。</li>
       <li><b>有人退賽</b> → 排名頁點他旁邊的「退賽」。他打過的場次還算數，之後不再被排對。</li>
       <li><b>電腦快沒電、想換一臺</b> → 按「匯出存檔」存一個檔，新電腦按「匯入存檔」。</li>
-      <li><b>對戰／排名分頁是空的</b> → 點進去它會告訴你差什麼、按哪裡補。</li>
       <li><b>不小心重整、瀏覽器關掉</b> → 直接重新打開網址，資料還在。</li>
+      <li><b>對戰／排名分頁是空的</b> → 點進去它會告訴你差什麼、按哪裡補。</li>
+      <li><b>副控說連不上</b> → 請他確認網址跟你複製的那條一樣，密碼是六碼。</li>
       <li><b>下一場比賽要重來</b> → 設定頁最下面「全部清除重來」。<b>先匯出存檔</b>再清。</li>
     </ul>
   </div></div>
@@ -446,28 +497,47 @@
   <div class="bk-step"><div class="no">12</div><div>
     <h3>比完了</h3>
     <p>排名頁按「列印／存成 PDF」，列印視窗裡選「存成 PDF」就有一份完整名次表可以發給選手。</p>
+    <p>這份手冊右上角也可以列印，印一張貼在櫃檯，換人顧店也交接得下去。</p>
   </div></div>
 
   <div class="bk-step"><div class="no plain">?</div><div>
     <h3>常見問題</h3>
     <p><b>要不要先註冊？</b>不用。沒有帳號這回事，打開就能用。</p>
+    <p><b>三種身分怎麼分？</b>看右上角那顆標籤：<b>主控</b>、<b>副控</b>、<b>選手</b>。
+       身分是跟著分頁走的，同一臺電腦不同分頁可以是不同身分。</p>
     <p><b>資料存在哪？</b>存在這臺電腦的瀏覽器裡，不會傳到別人那邊。
-       只有你主動「開房」的時候，才會把這一場的對戰表放到伺服器上給手機看，而且 36 小時後自動消掉。</p>
+       只有你主動「開房」的時候，才會把這一場的對戰表放到伺服器上給手機看，
+       而且 36 小時後自動消掉。<b>副控密碼不會出現在傳給選手的資料裡。</b></p>
     <p><b>一場最多幾人？</b>沒有上限。512 人九輪也是一瞬間排完。</p>
+    <p><b>QR 會不會外連？</b>不會，是這個網頁自己畫的，沒有任何第三方服務。</p>
     <p><b>可以自己架嗎？</b>可以，這是開源的（MIT）：
-       <span class="key">github.com/akai1030/NICEPLAY</span></p>
+       <span class="key">github.com/akai1030/NICEPLAY</span><br>
+       自己架伺服器的話，發出去的連結會自動帶上位址，對方不用設定。</p>
   </div></div>
 
+  <div class="bk-thanks">
+    <h3>特別鳴謝</h3>
+    <div class="th">
+      <b>桌遊記</b>
+      <span>從賽事到活動執行的全方面資源。這套系統不是在白板上想出來的，
+        是在真的有人坐下來對局、真的要在時間內排完下一輪的現場長出來的 ——
+        每一個看起來理所當然的設計，背後都有一次「那天差點來不及」。</span>
+    </div>
+    <div class="th">
+      <b>轉駅創研試驗所</b>
+      <span>把「做一個工具給大家用」這件事當成可以認真投入的事。</span>
+    </div>
+  </div>
+
   </div></div>
-</div>
 
 <div id="toast"></div>
 
-<script src="src/qr.js?v=202608160237"></script>
-<script src="src/engine.js?v=202608160237"></script>
-<script src="src/store.js?v=202608160237"></script>
-<script src="src/net.js?v=202608160237"></script>
-<script src="src/ui.js?v=202608160237"></script>
+<script src="src/qr.js?v=202608160320"></script>
+<script src="src/engine.js?v=202608160320"></script>
+<script src="src/store.js?v=202608160320"></script>
+<script src="src/net.js?v=202608160320"></script>
+<script src="src/ui.js?v=202608160320"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -475,7 +545,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608160237').catch(function () {});
+    navigator.serviceWorker.register('sw.js?v=202608160320').catch(function () {});
   });
 }
 </script>

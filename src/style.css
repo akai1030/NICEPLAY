@@ -291,7 +291,7 @@ table.rank tr.out td.l { text-decoration: line-through; }
   padding: 8px 6px 8px 16px; flex: 0 0 auto; }
 
 /* ── 開房之後：兩條給人的東西 ─────────────────────────
-   店員拿「網址＋密碼」，選手掃「QR」。
+   副控拿「網址＋密碼」，選手掃「QR」。
    六碼不再用大字展示 —— 現場沒有人要用唸的，要的是可以貼進群組的東西。 */
 .lk { background: var(--surface); border: 2px solid var(--line-hard);
       border-radius: var(--r); padding: 12px 14px; margin-bottom: 10px; }
@@ -310,6 +310,15 @@ table.rank tr.out td.l { text-decoration: line-through; }
 .lkrow button { flex: 0 0 auto; min-height: 42px; }
 .lkrow button.done { background: var(--lime); border-color: var(--lime); color: var(--black); }
 
+/* 給選手那一格直接把 QR 畫出來 —— 不要讓人按一顆按鈕才知道它長怎樣。
+   問「選手 QR 在哪」的時候，答案就不該是「先按這裡」。 */
+.lkbody { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.lkqr { flex: 0 0 auto; background: #FFF; border-radius: 10px; padding: 8px; line-height: 0; }
+.lkqr-img { width: 116px; height: 116px; }
+.lkqr-img svg { width: 100%; height: 100%; display: block; }
+.lkside { flex: 1 1 240px; min-width: 0; }
+.lkurl { font-size: 11px; color: var(--faint); margin-top: 8px; word-break: break-all; }
+
 details.adv { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 details.adv summary { font-size: 13px; color: var(--dim); cursor: pointer;
                       list-style: none; padding: 4px 0; }
@@ -326,7 +335,7 @@ details.adv input { font-family: var(--f-mono); }
 .empty p { font-size: 14.5px; color: var(--dim); line-height: 1.8; margin-bottom: 18px; }
 .empty button { min-width: 180px; }
 
-/* ── 店員加入 ─────────────────────────────────────────── */
+/* ── 副控加入 ─────────────────────────────────────────── */
 #staff { position: fixed; inset: 0; z-index: 60; background: var(--bg);
          display: none; align-items: center; justify-content: center; padding: 20px; }
 body.staffgate #staff { display: flex; }
@@ -436,7 +445,7 @@ body.player #btnBook { display: none !important; }
 .pv-qr-cap em { font-style: normal; font-weight: 400; color: #555;
                 display: block; font-size: .62vw; }
 
-/* 店員（手機）只回報勝負，其他都不給碰 —— 避免在店裡誤觸改設定 */
+/* 副控（手機）只回報勝負，其他都不給碰 —— 避免在店裡誤觸改設定 */
 body.guest .tabs button[data-tab="tSetup"] { display: none; }
 body.guest #btnNext, body.guest #btnRepair, body.guest #btnTimer,
 body.guest #btnPresent, body.guest .dropb, body.guest .mt .dw { display: none; }
@@ -608,6 +617,38 @@ body.present #btnBook { display: none; }
   color: var(--dim); line-height: 1.75; margin: 10px 0 4px; }
 .bk-note.warn { border-left-color: var(--gold); }
 .bk-note b { color: var(--fg); }
+/* 手冊開頭的識別區。這份東西會被印出來貼在櫃檯，
+   所以第一眼要先講清楚「這是什麼系統」，再進操作步驟。 */
+.bk-hero { padding-bottom: 26px; margin-bottom: 24px;
+           border-bottom: 2px solid var(--line-hard); }
+.bk-hero .lock { display: block; width: min(400px, 88%); aspect-ratio: 1317 / 593;
+                 background: url(../assets/lockup.png) left center/contain no-repeat; }
+:root[data-theme="light"] .bk-hero .lock { background-image: url(../assets/lockup-light.png); }
+.bk-motto { margin-top: 18px; font-size: clamp(18px, 3vw, 24px);
+            font-weight: 900; line-height: 1.35; }
+.bk-motto b { background: var(--grad); -webkit-background-clip: text;
+              background-clip: text; color: transparent; }
+.bk-motto span { display: block; font-family: var(--f-mono); font-size: 11px;
+                 letter-spacing: .34em; color: var(--label-fg);
+                 margin-top: 7px; font-weight: 400; }
+.bk-manifesto { font-size: 15.5px; line-height: 1.95; color: var(--dim); margin-top: 18px; }
+.bk-manifesto b { color: var(--fg); }
+.bk-name { margin-top: 22px; padding-left: 14px; border-left: 3px solid var(--purple); }
+.bk-en { display: block; font-family: var(--f-mono); font-size: 15px; font-weight: 700;
+         letter-spacing: .3em; color: var(--fg); }
+.bk-full { display: block; font-family: var(--f-mono); font-size: 11.5px;
+           letter-spacing: .02em; color: var(--faint); margin-top: 4px; line-height: 1.6; }
+.bk-cn { display: block; font-size: 16px; font-weight: 900; margin-top: 6px; }
+.bk-decode { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 18px; }
+.bk-decode span { font-family: var(--f-mono); font-size: 11.5px; color: var(--dim);
+                  background: var(--surface); border: 1px solid var(--line);
+                  border-radius: 6px; padding: 3px 9px; white-space: nowrap; }
+.bk-decode b { font-size: 14px; font-weight: 700; color: var(--accent-fg); }
+.bk-yomi { font-size: 14.5px; line-height: 1.9; color: var(--dim); margin-top: 18px;
+           background: var(--surface); border-left: 4px solid var(--lime);
+           border-radius: 0 var(--r) var(--r) 0; padding: 12px 15px; }
+.bk-yomi b { color: var(--fg); }
+
 .bk-lede { font-size: 16px; line-height: 1.85; color: var(--dim); margin-bottom: 20px; }
 .bk-lede b { color: var(--fg); }
 .bk-who { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 24px; }
@@ -620,6 +661,19 @@ body.present #btnBook { display: none; }
 .bk-card.a { border-color: var(--blue); }
 .bk-card.b { border-color: var(--purple); }
 .bk-card.c { border-color: var(--lime); }
+
+/* 手冊最後的鳴謝 */
+.bk-thanks { margin-top: 30px; padding-top: 22px; border-top: 2px solid var(--line-hard); }
+.bk-thanks h3 { font-family: var(--f-mono); font-size: 11px; letter-spacing: .24em;
+                text-transform: uppercase; color: var(--label-fg); margin-bottom: 16px; }
+.bk-thanks h3::after { content: ' · SPECIAL THANKS'; color: var(--faint); }
+.bk-thanks .th { display: flex; gap: 14px; align-items: baseline;
+                 padding: 12px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.bk-thanks .th:first-of-type { border-top: 0; }
+.bk-thanks .th b { flex: 0 0 auto; font-size: 17px; font-weight: 900;
+  background: var(--grad); -webkit-background-clip: text; background-clip: text;
+  color: transparent; }
+.bk-thanks .th span { flex: 1 1 260px; font-size: 14px; color: var(--dim); line-height: 1.85; }
 
 /* ── 提示條 ─────────────────────────────────────────── */
 #toast { position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; display: none;
@@ -653,6 +707,17 @@ body.present #btnBook { display: none; }
   h2.sec em { color: #111; }
 
   /* 手冊開著就印手冊 —— 店家可以印一張貼在櫃檯 */
+  .bk-hero { border-bottom-color: #111; break-after: avoid; }
+  .bk-manifesto, .bk-yomi, .bk-full { color: #333; }
+  .bk-motto b { background: none; -webkit-text-fill-color: #111; color: #111; }
+  .bk-yomi { background: #f4f4f6; border-left-color: #666; }
+  .bk-decode span { background: #f4f4f6; border-color: #ccc; color: #333; }
+  .bk-decode b { color: #111; }
+  .bk-name { border-left-color: #111; }
+  .bk-thanks { border-top-color: #111; break-inside: avoid; }
+  .bk-thanks h3 { color: #555; }
+  .bk-thanks .th b { background: none; -webkit-text-fill-color: #111; color: #111; }
+  .bk-thanks .th span { color: #333; }
   #book { display: none; }
   #book.on { display: block !important; position: static; inset: auto;
              background: #fff; color: #111; }

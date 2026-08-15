@@ -45,6 +45,12 @@ function blank() {
     players: [],
     matches: [],
     timer: { running: false, endsAt: 0, remainMs: 0, durMs: 0, round: null },
+    /* 開房之後放選手那一組資訊。放在 state 裡是因為投影常常是
+       另一個視窗（甚至另一臺筆電），那邊沒有連線層，只收得到狀態 ——
+       不放這裡的話投影畫面就畫不出 QR。
+       只放選手碼，店員密碼絕對不能進來：state 會送給每一個加入者，
+       選手讀得到，等於把權限發出去。 */
+    room: null,                 /* { view, srv } 或 null */
     theme: 'dark',              /* dark | light，全域，兩個視窗共用 */
     phase: 'setup',             /* setup | running | done */
     rev: 0
@@ -71,7 +77,7 @@ function create() {
         if (!e.data || e.data.rev === undefined) return;
         if (e.data.rev <= state.rev) return;        /* 比自己舊就忽略 */
         state = e.data.state;
-        quiet = true; emit(); quiet = false;
+        quiet = true; emit(true); quiet = false;
       };
     }
   } catch (err) { chan = null; }
@@ -82,12 +88,16 @@ function create() {
       if (e.key !== KEY || !e.newValue) return;
       try {
         var next = JSON.parse(e.newValue);
-        if (next && next.rev > state.rev) { state = next; quiet = true; emit(); quiet = false; }
+        if (next && next.rev > state.rev) { state = next; quiet = true; emit(true); quiet = false; }
       } catch (err) { /* 壞掉的就忽略，下一次寫入會蓋掉 */ }
     });
   }
 
-  function emit() { subs.forEach(function (fn) { try { fn(state); } catch (e) {} }); }
+  /* 訂閱者要分得出這份狀態是「這個視窗自己改的」還是「別人推過來的」。
+     分不出來的話，收到別人的狀態又照樣往外推，兩個視窗就會互推到天荒地老。 */
+  function emit(remote) {
+    subs.forEach(function (fn) { try { fn(state, !!remote); } catch (e) {} });
+  }
 
   function commit(fn) {
     if (typeof fn === 'function') fn(state);
@@ -103,7 +113,7 @@ function create() {
   return {
     get: function () { return state; },
     commit: commit,
-    subscribe: function (fn) { subs.push(fn); fn(state); return function () {
+    subscribe: function (fn) { subs.push(fn); fn(state, false); return function () {
       subs = subs.filter(function (f) { return f !== fn; }); }; },
     reset: function () { return commit(function () {
       var b = blank(); Object.keys(state).forEach(function (k) { delete state[k]; });

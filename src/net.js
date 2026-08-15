@@ -6,7 +6,7 @@
    三種角色
      off   單機。資料只在這臺瀏覽器裡（預設）
      host  主控。開房的那一臺，配對／下一輪都在這裡算
-     guest 店員。用主控房號加入，可以回報勝負
+     guest 副控。用主控房號加入，可以回報勝負
      watch 選手。用觀眾碼加入，只能看 —— 伺服器會擋掉所有寫入
 
    同步策略跟伺服器對稱：
@@ -20,22 +20,51 @@
 })(typeof self !== 'undefined' ? self : this, function () {
 'use strict';
 
-var LS = 'niceplay.net.v1';
+/* 身分存在「分頁」而不是「這臺電腦」。
 
-function loadConn() {
-  try { return JSON.parse(localStorage.getItem(LS)) || null; } catch (e) { return null; }
+   localStorage 是整個網域共用的，所以主控開一個分頁當主控、
+   再開一個分頁想當副控時，兩個分頁會讀到同一份連線資料，
+   後開的那個直接繼承主控身分 —— 同一臺電腦就分不出誰是誰。
+   sessionStorage 是每個分頁各一份，重整還在、關掉才沒，
+   剛好就是「身分」該有的壽命。
+
+   主控另外在 localStorage 留一份備援：主控端不小心關掉整個瀏覽器
+   再打開，還接得回原本的房間（那把 hostToken 掉了就推不了狀態，
+   等於整場要重開房）。但只在這個分頁沒有自己的身分、
+   而且網址沒有指定身分的時候才會用到。 */
+var SS = 'niceplay.net.v1';        /* 這個分頁的身分 */
+var LS = 'niceplay.host.v1';       /* 主控備援，整臺電腦一份 */
+
+function readJSON(store, key) {
+  try { return JSON.parse(store.getItem(key)) || null; } catch (e) { return null; }
 }
-function saveConn(c) {
+function loadConn(opts) {
+  /* offline：這個視窗完全不要連線（投影窗）。
+     window.open 開出來的視窗會「複製一份」opener 的 sessionStorage，
+     所以投影窗會繼承主控身分 —— 不擋的話兩個視窗都會推狀態。 */
+  if (opts.offline) return null;
+  var c = readJSON(sessionStorage, SS);
+  if (c) return c;
+  if (opts.isolate) return null;   /* 網址已經指定身分，不要繼承主控 */
+  var h = readJSON(localStorage, LS);
+  return (h && h.role === 'host') ? h : null;
+}
+function saveConn(c, offline) {
+  if (offline) return;               /* 投影窗不留任何身分 */
   try {
-    if (c) localStorage.setItem(LS, JSON.stringify(c));
-    else localStorage.removeItem(LS);
+    if (c) sessionStorage.setItem(SS, JSON.stringify(c));
+    else sessionStorage.removeItem(SS);
+  } catch (e) {}
+  try {
+    if (c && c.role === 'host') localStorage.setItem(LS, JSON.stringify(c));
   } catch (e) {}
 }
+function dropHostBackup() { try { localStorage.removeItem(LS); } catch (e) {} }
 
 function create(opts) {
   opts = opts || {};
   var base = (opts.server || '').replace(/\/+$/, '');
-  var conn = loadConn();               /* {code, hostToken?, role} */
+  var conn = loadConn(opts);           /* {code, hostToken?, role} */
   var es = null, pollTimer = null, retry = null;
   var lastRev = 0;
   var online = false;
@@ -74,7 +103,7 @@ function create(opts) {
       body: JSON.stringify({ state: state })
     }).then(function (j) {
       conn = { code: j.code, viewCode: j.viewCode, hostToken: j.hostToken, role: 'host' };
-      saveConn(conn); lastRev = j.rev; online = true;
+      saveConn(conn, opts.offline); lastRev = j.rev; online = true;
       listen();
       status('已開房 ' + j.code);
       return conn;
@@ -88,7 +117,7 @@ function create(opts) {
       /* 伺服器會告訴我們用的是哪一組碼 —— 觀眾碼就是唯讀 */
       var role = j.readOnly ? 'watch' : 'guest';
       conn = { code: code, role: role };
-      saveConn(conn); lastRev = j.rev; online = true;
+      saveConn(conn, opts.offline); lastRev = j.rev; online = true;
       on.state(j.state, role);
       listen();
       status(role === 'watch' ? '已進入查詢模式' : '已加入 ' + code);
@@ -98,7 +127,8 @@ function create(opts) {
 
   function leave() {
     stop();
-    conn = null; saveConn(null); online = false;
+    if (conn && conn.role === 'host') dropHostBackup();
+    conn = null; saveConn(null, opts.offline); online = false;
     status('已離線，回到單機模式');
   }
 
@@ -200,7 +230,8 @@ function create(opts) {
       return true;
     }).catch(function () {
       /* 房間過期或伺服器換過 —— 回到單機，資料還在本機不會掉 */
-      conn = null; saveConn(null);
+      if (conn && conn.role === 'host') dropHostBackup();
+      conn = null; saveConn(null, opts.offline);
       status('原本的房間已經不在，回到單機模式', true);
       return false;
     });

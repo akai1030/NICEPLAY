@@ -48,6 +48,7 @@
     await load(H, '../index.html');
     W(H).localStorage.removeItem('niceplay.state.v1');
     W(H).localStorage.removeItem('niceplay.net.v1');
+    W(H).sessionStorage.clear();
     await load(H, '../index.html');
     killSSE(H);
     await sleep(500);
@@ -68,7 +69,7 @@
     /* ── 開房 ────────────────────────────── */
     say('\n【2】開房');
     click(H, el(H, 'btnHost')); await sleep(1200);
-    var code = el(H, 'pwStaff').value.trim();      /* 店員密碼＝主控房號 */
+    var code = el(H, 'pwStaff').value.trim();      /* 副控密碼＝主控房號 */
     ok(/^[A-Z0-9]{6}$/.test(code), '房號格式不對：' + code);
     ok(el(H, 'netPill').textContent.indexOf('主控') === 0, '沒有顯示主控狀態');
     say('  房號 ' + code + ' · 頂列顯示「' + el(H, 'netPill').textContent + '」✓');
@@ -79,6 +80,8 @@
     killBC(G); killSSE(G);
     W(G).localStorage.removeItem('niceplay.state.v1');
     W(G).localStorage.removeItem('niceplay.net.v1');
+    W(G).sessionStorage.clear();          /* 身分存在分頁裡 */
+    W(G).localStorage.removeItem('niceplay.host.v1');   /* 另一臺裝置不會有主控備援 */
     await load(G, '../index.html');
     killBC(G); killSSE(G);
     await sleep(400);

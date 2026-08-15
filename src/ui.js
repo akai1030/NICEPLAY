@@ -25,7 +25,19 @@ var ME_KEY = 'niceplay.me';
 /* 官方房間伺服器。自己架的話改這一行，或在設定頁直接改欄位（會記在瀏覽器裡）。 */
 var DEFAULT_SERVER = 'https://niceplayroom.transtation.org';
 
+/* 網址已經指定身分（副控／選手）的話，這個分頁就不要去繼承
+   這臺電腦上的主控身分 —— 不然同一臺電腦開副控會變成第二個主控。 */
+var ROLE_HASH = /^#(sub|staff)\b|^#join=/.test(location.hash);
+
+/* 投影視窗不連線。它跟控制台在同一臺電腦，狀態走 BroadcastChannel 就夠了。
+   讓它也連上去的話，兩個視窗會拿到同一把 hostToken、都以為自己是主控，
+   於是「收到對方的狀態 → 再推回去」互推到天荒地老 ——
+   伺服器被打爆，畫面看起來就是一直斷線。 */
+var IS_PRESENT = (location.hash === '#present');
+
 var net = window.Net.create({
+  offline: IS_PRESENT,
+  isolate: ROLE_HASH,
   server: localStorage.getItem(SRV_KEY) || DEFAULT_SERVER,
   onState: function (remote, role) {
     /* 伺服器來的整份狀態直接取代本機。主控與加入者都吃這條，
@@ -304,7 +316,7 @@ el('matchList').addEventListener('click', function (e) {
   var table = d.dataset.t, want = d.dataset.r;
   var st = store.get(), r = currentRound(st);
 
-  if (net.role === 'watch') { toast('查詢模式只能看，回報請找店員', true); return; }
+  if (net.role === 'watch') { toast('查詢模式只能看，回報請找副控', true); return; }
   if (net.role === 'guest') {
     /* 加入者不改本機，送給伺服器；伺服器套用完會把新狀態推回來 */
     net.sendResult(r, table, want).catch(function () {});
@@ -399,7 +411,7 @@ addEventListener('keydown', function (e) {
 
    給出去的東西分成兩種，因為兩種人的處境完全不一樣：
 
-     店員　拿「網址 ＋ 密碼」。密碼不寫在網址裡 —— 網址會在群組裡
+     副控　拿「網址 ＋ 密碼」。密碼不寫在網址裡 —— 網址會在群組裡
            被轉來轉去，密碼才是真正的權限。他打開網址會看到一個
            只有輸入框的畫面，輸入密碼就進去。
      選手　掃投影畫面上的 QR，或拿一條把查詢碼寫在裡面的網址。
@@ -409,13 +421,13 @@ function siteURL() {
   return location.origin + location.pathname.replace(/index\.html$/, '');
 }
 /* 自己架伺服器的店家，發出去的連結要把位址帶著走 ——
-   不然店員與選手會連到官方那臺，然後看到「找不到這個房號」。
+   不然副控與選手會連到官方那臺，然後看到「找不到這個房號」。
    用官方位址的時候不加，連結才短。 */
 function srvTail() {
   var sv = net.server;
   return (!sv || sv === DEFAULT_SERVER) ? '' : '&srv=' + encodeURIComponent(sv);
 }
-function staffURL() { return siteURL() + '#staff' + srvTail(); }
+function staffURL() { return siteURL() + '#sub' + srvTail(); }
 function viewURL(code) { return siteURL() + '#join=' + code + srvTail(); }
 
 function paintNet(st) {
@@ -424,7 +436,7 @@ function paintNet(st) {
   pill.hidden = (role === 'off');
   pill.className = 'netpill ' + (st.bad ? 'bad' : role);
   pill.textContent = role === 'off' ? '' : ({
-    host: '主控 ', guest: '店員 ', watch: '查詢 '
+    host: '主控 ', guest: '副控 ', watch: '選手 '
   }[role] || '') + st.code + (st.online ? '' : ' · 斷線');
 
   el('netOff').hidden = (role !== 'off');
@@ -437,7 +449,7 @@ function paintNet(st) {
     el('roomCode').value = net.code;
     el('viewCode').value = net.viewCode;
     el('roomHint').innerHTML =
-      '兩邊都不用打房號：店員貼網址、輸入密碼；選手掃 QR。<br>' +
+      '兩邊都不用打房號：副控貼網址、輸入密碼；選手掃 QR。<br>' +
       '房間會在最後一次操作的 36 小時後自動消失。';
   }
 
@@ -446,11 +458,10 @@ function paintNet(st) {
   var was = document.body.className;
   document.body.classList.toggle('guest',  role === 'guest');
   document.body.classList.toggle('player', role === 'watch');
-  /* 密碼畫面只由它自己開關（輸入成功、或按「我不是店員」）。
+  /* 密碼畫面只由它自己開關（輸入成功、或按「我不是副控」）。
      這裡不要碰 —— 之前寫成「不是選手就關掉」，結果這臺剛好是主控的話，
      一開 #staff 就被自己的狀態推播關掉，直接掉回設定頁。 */
 
-  paintPvQR();
   if (st.msg) toast(st.msg, st.bad);
   if (document.body.className !== was) render(store.get());
 }
@@ -491,19 +502,32 @@ function qrSVG(text, size) {
   try { return QR.svg(text, { size: size, margin: 2, ecc: 'M' }); }
   catch (e) { return ''; }
 }
-function paintPvQR() {
-  var box = el('pvQR');
-  if (!box) return;
-  var on = (net.role === 'host' && net.viewCode);
-  box.hidden = !on;
-  if (!on) { box._url = ''; return; }
-  var url = viewURL(net.viewCode);
-  if (box._url === url) return;                 /* 沒變就不要重畫 */
+/* 選手連結一律從 state.room 算，不要從連線層算 ——
+   投影常常是另一個視窗，那邊沒有連線，只收得到狀態。 */
+function roomViewURL(st) {
+  var r = st && st.room;
+  if (!r || !r.view) return '';
+  return siteURL() + '#join=' + r.view + (r.srv ? '&srv=' + encodeURIComponent(r.srv) : '');
+}
+
+/* 一個容器畫一次，網址沒變就不重畫（QR 不便宜） */
+function drawQR(boxId, imgId, url, size) {
+  var box = el(boxId); if (!box) return;
+  box.hidden = !url;
+  if (!url) { box._url = ''; return; }
+  if (box._url === url) return;
   box._url = url;
-  el('pvQRImg').innerHTML = qrSVG(url, 240);
+  el(imgId).innerHTML = qrSVG(url, size);
+}
+
+function paintQRs(st) {
+  var url = roomViewURL(st);
+  drawQR('pvQR', 'pvQRImg', url, 240);          /* 投影右下角常駐 */
+  drawQR('sideQR', 'sideQRImg', url, 300);      /* 設定頁「給選手」那一格 */
+  if (url) el('sideQRUrl').textContent = url;
 }
 el('btnQR').onclick = function () {
-  var url = el('urlView').value;
+  var url = roomViewURL(store.get()) || el('urlView').value;
   el('qrImg').innerHTML = qrSVG(url, 640);
   el('qrUrl').textContent = url;
   el('qrbox').classList.add('on');
@@ -620,7 +644,7 @@ el('btnWtLeave').onclick = function () {
   location.reload();
 };
 
-/* ── 店員加入畫面 ─────────────────────────────────────── */
+/* ── 副控加入畫面 ─────────────────────────────────────── */
 function openStaffGate(on) {
   document.body.classList.toggle('staffgate', on);
   if (on) setTimeout(function () { el('stCode').focus(); }, 60);
@@ -659,7 +683,9 @@ el('fServer').oninput = function () {
 
 el('btnHost').onclick = function () {
   net.host(store.get()).then(function () {
-    toast('開好了 —— 把店員那條網址跟密碼給店員，選手掃投影上的 QR');
+    var srv = (net.server && net.server !== DEFAULT_SERVER) ? net.server : '';
+    store.commit(function (s) { s.room = { view: net.viewCode, srv: srv }; });
+    toast('開好了 —— 網址跟密碼給副控，選手掃右邊那個 QR');
   }).catch(function (e) { toast('開房失敗：' + e.message, true); });
 };
 el('btnJoin').onclick = function () {
@@ -673,10 +699,11 @@ el('btnJoin').onclick = function () {
 el('btnLeave').onclick = function () {
   if (!confirmOnce('leave', '離線之後這臺就變回單機，其他裝置看不到你的操作 —— 再按一次確定')) return;
   net.leave();
+  store.commit(function (s) { s.room = null; });
 };
 
 /* ── 網址路由 ─────────────────────────────────────────
-   #staff     店員：輸入密碼的畫面
+   #staff     副控：輸入密碼的畫面
    #join=XXX  選手：直接進查詢畫面，什麼都不用打
    #present   投影                                     */
 function routeHash() {
@@ -706,7 +733,8 @@ function routeHash() {
     });
     return true;
   }
-  if (h === 'staff') { openStaffGate(true); return true; }
+  /* #staff 是舊名，留著讓已經發出去的連結還能用 */
+  if (h === 'sub' || h === 'staff') { openStaffGate(true); return true; }
   return false;
 }
 
@@ -848,6 +876,7 @@ function render(st) {
   el('hintLoss').textContent = st.config.rules.loss;
 
   applyTheme(st);
+  paintQRs(st);
   paintMatches(st);
   paintRank(st);
   if (document.body.classList.contains('player')) paintWatch(st);
@@ -1044,12 +1073,19 @@ function tick() {
   c.classList.toggle('urgent', has && ms <= 30000);
 }
 
-store.subscribe(function (st) {
+var booted = false;
+store.subscribe(function (st, remote) {
   if (!fillForm._once) { fillForm(st); fillForm._once = true; }
   render(st);
-  /* 主控端：本機一有變動就把整份狀態推上去。
-     applyingRemote 擋掉「收到推送 → 套用 → 又推回去」的迴圈。 */
-  if (!applyingRemote && net.role === 'host') net.pushState(st);
+
+  /* 什麼時候才推：
+     · remote 為真 —— 這份是別人推過來的，再推回去就變成互推迴圈
+     · booted 為假 —— 這是訂閱當下的第一次呼叫，不是使用者改的。
+       主控備援身分會讓新開的分頁一開場就以為自己是主控，
+       這時候推出去的是它自己還沒載入的空白狀態，等於把房間洗掉。
+       房間本來就是用開房當下那份狀態建的，開場不需要再推一次。 */
+  if (booted && !remote && !applyingRemote && net.role === 'host') net.pushState(st);
+  booted = true;
 });
 
 el('fServer').value = localStorage.getItem(SRV_KEY) || DEFAULT_SERVER;
@@ -1057,7 +1093,8 @@ el('fServer').value = localStorage.getItem(SRV_KEY) || DEFAULT_SERVER;
 /* 網址決定身分。有 #staff / #join= 就照網址走，
    否則接回上次的房間（重整、關掉再開都不會掉線）。 */
 el('btnGoSetup').onclick = el('btnGoSetup2').onclick = function () { goTab('tSetup'); };
-if (!routeHash()) net.resume();
+if (IS_PRESENT) { /* 投影視窗不連線，狀態靠 BroadcastChannel */ }
+else if (!routeHash()) net.resume();
 addEventListener('hashchange', function () {
   if (location.hash === '#present') return;
   routeHash();

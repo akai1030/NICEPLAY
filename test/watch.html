@@ -1,5 +1,5 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>NICEPLAY 店員／選手分流測試</title></head>
+<html><head><meta charset="utf-8"><title>NICEPLAY 副控／選手分流測試</title></head>
 <body style="margin:0;background:#111;color:#eee;font:13px/1.6 monospace">
 <div style="display:flex;gap:6px">
   <iframe id="h" style="width:620px;height:820px;border:0"></iframe>
@@ -8,7 +8,7 @@
 </div>
 <pre id="out">RUNNING</pre>
 <script>
-/* 三個 iframe：主控（筆電）／店員（手機）／選手（手機）。
+/* 三個 iframe：主控（筆電）／副控（手機）／選手（手機）。
    上一版的測試只檢查了「按鈕有沒有藏起來」，
    結果漏掉最嚴重的一個 —— 選手重整之後停在設定頁，
    看得到房號、開始比賽、全部清除重來。
@@ -67,7 +67,7 @@
     var F = document.createElement('iframe');
     F.style.cssText = 'width:600px;height:500px;border:0;position:absolute;left:-9999px';
     document.body.appendChild(F);
-    await load(F, '../index.html'); iso(F); W(F).localStorage.clear();
+    await load(F, '../index.html'); iso(F); W(F).localStorage.clear(); W(F).sessionStorage.clear();
     await load(F, '../index.html'); iso(F); await sleep(500);
     var tp = D(F).querySelector('.tabs button[data-tab="tPlay"]');
     ok(!tp.disabled, '對戰分頁還是 disabled');
@@ -79,11 +79,12 @@
     click(F, el(F, 'btnGoSetup')); await sleep(200);
     ok(el(F, 'tSetup').classList.contains('on'), '「回設定頁」沒有作用');
     say('  ' + el(F, 'playEmptyWhy').textContent.trim() + ' ✓');
+    F.src = 'about:blank';
 
     /* ── 主控開賽並開房 ─────────────────────── */
     say('\n【1】主控開賽、開房');
     await load(H, '../index.html');
-    W(H).localStorage.clear();
+    W(H).localStorage.clear(); W(H).sessionStorage.clear();
     await load(H, '../index.html'); iso(H); await sleep(400);
 
     setVal(H, 'fName', '分流測試賽');
@@ -97,60 +98,109 @@
     var staffURL = el(H, 'urlStaff').value;
     var pw       = el(H, 'pwStaff').value;
     var viewURL  = el(H, 'urlView').value;
-    ok(/#staff(&|$)/.test(staffURL), '店員網址不對：' + staffURL);
-    ok(/^[A-Z0-9]{6}$/.test(pw), '店員密碼不對：' + pw);
+    ok(/#sub(&|$)/.test(staffURL), '副控網址不對：' + staffURL);
+    ok(/^[A-Z0-9]{6}$/.test(pw), '副控密碼不對：' + pw);
     ok(/#join=[A-Z0-9]{6}(&|$)/.test(viewURL), '選手網址不對：' + viewURL);
     ok(staffURL.indexOf('srv=') > 0, '自架伺服器時連結沒有帶位址：' + staffURL);
-    ok(viewURL.indexOf(pw) < 0, '選手網址裡竟然含有店員密碼');
-    say('  店員 ' + staffURL.replace(/^https?:\/\/[^/]*/, '') + ' + 密碼 ' + pw);
+    ok(viewURL.indexOf(pw) < 0, '選手網址裡竟然含有副控密碼');
+    say('  副控 ' + staffURL.replace(/^https?:\/\/[^/]*/, '') + ' + 密碼 ' + pw);
     say('  選手 ' + viewURL.replace(/^https?:\/\/[^/]*/, '') + ' ✓');
 
     say('\n【2】沒有大字房號了，改成可複製的欄位');
     ok(!D(H).querySelector('.roomcode'), '還留著大字房號');
-    ok(el(H, 'urlStaff').tagName === 'INPUT', '店員網址不是可複製的輸入框');
+    ok(el(H, 'urlStaff').tagName === 'INPUT', '副控網址不是可複製的輸入框');
     say('  兩條都是 readonly input，旁邊有複製鈕 ✓');
 
-    say('\n【3】投影畫面右下角有常駐 QR');
-    ok(!el(H, 'pvQR').hidden, '投影 QR 沒有出現');
-    ok(D(H).querySelector('#pvQRImg svg'), 'QR 沒有畫出來');
-    say('  pvQR 已顯示，SVG 有內容 ✓');
+    say('\n【2b】身分存在分頁，不存在整臺電腦');
+    /* 存 localStorage 的話同一個網域所有分頁共用一份身分，
+       主控開第二個分頁想當副控就會直接繼承主控。 */
+    ok(!!W(H).sessionStorage.getItem('niceplay.net.v1'), '身分沒有存進 sessionStorage');
+    ok(!W(H).localStorage.getItem('niceplay.net.v1'),
+       '身分還留在 localStorage —— 那樣所有分頁會共用同一個身分');
+    var backup = W(H).localStorage.getItem('niceplay.host.v1');
+    ok(!!backup, '主控沒有留備援（關掉瀏覽器再開就接不回房間了）');
+    ok(backup && JSON.parse(backup).role === 'host', '備援存的不是主控身分');
+    ok(backup && JSON.parse(backup).hostToken, '備援沒有 hostToken，接回去也推不了狀態');
+    say('  身分在 sessionStorage，主控另有一份 localStorage 備援 ✓');
 
-    /* ── 店員：網址 + 密碼 ─────────────────── */
-    say('\n【4】店員：打開網址看到密碼輸入畫面');
+    say('\n【3】選手 QR 不用按任何按鈕就看得到');
+    ok(!el(H, 'sideQR').hidden, '設定頁「給選手」那格沒有直接畫出 QR');
+    ok(D(H).querySelector('#sideQRImg svg'), '設定頁的 QR 沒有內容');
+    ok(!el(H, 'pvQR').hidden, '投影 QR 沒有出現');
+    ok(D(H).querySelector('#pvQRImg svg'), '投影 QR 沒有畫出來');
+    /* 開賽之後畫面會自動切到對戰頁，設定頁那格量不到大小 —— 先切回去再量 */
+    click(H, D(H).querySelector('.tabs button[data-tab="tSetup"]')); await sleep(150);
+    var qsz = D(H).querySelector('#sideQRImg svg').getBoundingClientRect();
+    ok(qsz.width > 60 && qsz.height > 60, 'QR 太小：' + Math.round(qsz.width) + 'px');
+    say('  設定頁與投影都直接畫出來了，' + Math.round(qsz.width) + 'px ✓');
+
+    say('\n【3b】投影開在另一個視窗、之後才開房 —— QR 一樣要出來');
+    /* 房間資訊如果只存在連線層，另一個視窗（投影）根本不知道你開了房。
+       所以選手碼要放進 state，靠 BroadcastChannel／伺服器一起送過去。 */
+    var V2 = document.createElement('iframe');
+    V2.style.cssText = 'width:600px;height:400px;border:0;position:absolute;left:-9999px';
+    document.body.appendChild(V2);
+    await load(V2, '../index.html#present');    /* 故意不 iso：模擬真的第二個視窗會收到廣播 */
+    try { W(V2).EventSource = undefined; } catch (e) {}
+    await sleep(900);
+    ok(D(V2).body.classList.contains('present'), '第二個視窗沒有進投影模式');
+    /* 投影視窗絕對不能連線 —— 它跟控制台共用 hostToken，
+       兩邊都推狀態就會互推到天荒地老，伺服器被打爆。 */
+    ok(!W(V2).sessionStorage.getItem('__never__'), '');
+    ok(el(V2, 'netPill').hidden || !el(V2, 'netPill').textContent,
+       '投影視窗竟然也連上線了：' + el(V2, 'netPill').textContent);
+    ok(!el(V2, 'pvQR').hidden, '另一個視窗的投影畫面沒有 QR');
+    ok(D(V2).querySelector('#pvQRImg svg'), '另一個視窗的 QR 沒有內容');
+    ok(JSON.parse(W(V2).localStorage.getItem('niceplay.state.v1')).room.view === viewURL.match(/#join=([A-Z0-9]+)/)[1],
+       '投影視窗拿到的選手碼不對');
+    say('  第二個視窗照樣畫得出 QR ✓');
+    /* 用完就收掉。headless 的虛擬時鐘會被「有請求在飛」暫停，
+       多留一個一直輪詢的視窗，整個測試就永遠跑不完。 */
+    V2.src = 'about:blank';
+
+    say('\n【3c】state 裡不能有副控密碼');
+    var shared = JSON.parse(W(H).localStorage.getItem('niceplay.state.v1'));
+    ok(JSON.stringify(shared).indexOf(pw) < 0,
+       'state 裡竟然含有副控密碼 —— 選手也會收到這份狀態');
+    ok(shared.room && shared.room.view, 'state 裡沒有選手碼');
+    say('  state 只有選手碼，沒有副控密碼 ✓');
+
+    /* ── 副控：網址 + 密碼 ─────────────────── */
+    say('\n【4】副控：打開網址看到密碼輸入畫面');
     var staffHash = staffURL.slice(staffURL.indexOf('#'));
-    await load(S, '../index.html'); iso(S); W(S).localStorage.clear();
+    await load(S, '../index.html'); iso(S); W(S).localStorage.clear(); W(S).sessionStorage.clear();
     await load(S, '../index.html' + staffHash); iso(S); await sleep(600);
-    ok(D(S).body.classList.contains('staffgate'), '沒有進入店員密碼畫面');
+    ok(D(S).body.classList.contains('staffgate'), '沒有進入副控密碼畫面');
     ok(vis(S, 'stCode'), '看不到密碼輸入框');
-    ok(!vis(S, 'fPlayers'), '店員竟然看得到設定頁的名單框');
-    ok(!vis(S, 'btnStart'), '店員竟然看得到「開始比賽」');
+    ok(!vis(S, 'fPlayers'), '副控竟然看得到設定頁的名單框');
+    ok(!vis(S, 'btnStart'), '副控竟然看得到「開始比賽」');
     say('  只有一個密碼框，設定頁完全看不到 ✓');
 
-    say('\n【5】店員輸入密碼進去');
+    say('\n【5】副控輸入密碼進去');
     setVal(S, 'stCode', pw);
     click(S, el(S, 'btnStJoin')); await sleep(1600);
     ok(!D(S).body.classList.contains('staffgate'), '密碼對了卻還卡在輸入畫面');
-    ok(D(S).body.classList.contains('guest'), '沒有進入店員模式');
+    ok(D(S).body.classList.contains('guest'), '沒有進入副控模式');
     ok(el(S, 'tPlay').classList.contains('on'), '沒有自動切到對戰頁');
-    ok(!vis(S, 'fPlayers'), '店員看得到設定頁的名單框');
-    ok(!vis(S, 'btnStart'), '店員看得到「開始比賽」');
-    ok(!vis(S, 'btnReset'), '店員看得到「全部清除重來」');
+    ok(!vis(S, 'fPlayers'), '副控看得到設定頁的名單框');
+    ok(!vis(S, 'btnStart'), '副控看得到「開始比賽」');
+    ok(!vis(S, 'btnReset'), '副控看得到「全部清除重來」');
     say('  進到對戰頁，設定頁的東西一個都看不到 ✓');
 
-    say('\n【6】店員可以回報，主控收得到');
+    say('\n【6】副控可以回報，主控收得到');
     var card = D(S).querySelectorAll('#matchList .mt')[0];
     var tbl = card.querySelector('.tb').textContent.trim();
     click(S, card.querySelectorAll('.sd')[0]);
     await sleep(2400);
     var hs = JSON.parse(W(H).localStorage.getItem('niceplay.state.v1'));
     var hm = hs.matches.filter(function (m) { return String(m.table) === tbl; })[0];
-    ok(hm && hm.result === 'a', '主控沒收到店員的回報');
-    say('  店員點第 ' + tbl + ' 桌 → 主控收到 ✓');
+    ok(hm && hm.result === 'a', '主控沒收到副控的回報');
+    say('  副控點第 ' + tbl + ' 桌 → 主控收到 ✓');
 
     /* ── 選手：掃 QR 進來，零輸入 ─────────── */
     say('\n【7】選手：連結一開就進查詢畫面，不用打任何東西');
     var joinHash = viewURL.slice(viewURL.indexOf('#'));
-    await load(P, '../index.html'); iso(P); W(P).localStorage.clear();
+    await load(P, '../index.html'); iso(P); W(P).localStorage.clear(); W(P).sessionStorage.clear();
     await load(P, '../index.html' + joinHash); iso(P); await sleep(1800);
     ok(D(P).body.classList.contains('player'), '沒有進入選手畫面');
     ok(vis(P, 'watch'), '選手畫面沒有顯示');
@@ -190,6 +240,31 @@
     ok(el(P, 'wtPlayer').textContent === '王小明', '重整後忘記選手是誰');
     say('  重整後仍在選手畫面，記得是誰 ✓');
 
+    say('\n【10b】同一臺電腦：主控分頁與副控分頁是不同身分');
+    /* 身分如果存在 localStorage，同一個網域所有分頁共用一份，
+       副控分頁會直接繼承主控身分 —— 同一臺電腦就分不出誰是誰。 */
+    ok(el(H, 'netPill').textContent.indexOf('主控') === 0,
+       '主控分頁的身分跑掉了：' + el(H, 'netPill').textContent);
+    ok(el(S, 'netPill').textContent.indexOf('副控') === 0,
+       '副控分頁沒有維持副控身分：' + el(S, 'netPill').textContent);
+    ok(D(H).body.classList.contains('guest') === false, '主控分頁被降成副控');
+    ok(D(S).body.classList.contains('guest') === true, '副控分頁不是副控');
+    /* 分頁之間真正的隔離由【10c】驗 —— 這個測試的畫面都是同一個分頁裡的
+       iframe，會共用 sessionStorage 與 localStorage，量不出分頁差異。 */
+    say('  主控 ' + el(H, 'netPill').textContent.trim() +
+        '　副控 ' + el(S, 'netPill').textContent.trim() + ' ✓');
+
+    say('\n【10c】新開一個分頁走 #sub，不會繼承主控身分');
+    var N = document.createElement('iframe');
+    N.style.cssText = 'width:400px;height:500px;border:0;position:absolute;left:-9999px';
+    document.body.appendChild(N);
+    await load(N, '../index.html' + staffHash); iso(N); await sleep(700);
+    ok(D(N).body.classList.contains('staffgate'), '新分頁沒有停在密碼畫面（繼承了主控身分）');
+    ok(el(N, 'netPill').hidden || el(N, 'netPill').textContent.indexOf('主控') < 0,
+       '新分頁直接變成主控了：' + el(N, 'netPill').textContent);
+    say('  乾淨地停在密碼畫面 ✓');
+    N.src = 'about:blank';
+
     say('\n【11】選手改不動勝負（伺服器擋，不是只藏按鈕）');
     var vcode = joinHash.replace('#join=', '').split('&')[0];
     var bad = await fetch(SRV + '/api/rooms/' + vcode + '/action', {
@@ -201,7 +276,7 @@
 
     /* ── 分頁不再灰掉 ─────────────────────── */
     say('');
-    say(fails === 0 ? '店員／選手分流全部通過 ✅' : '有 ' + fails + ' 項失敗 ❌');
+    say(fails === 0 ? '副控／選手分流全部通過 ✅' : '有 ' + fails + ' 項失敗 ❌');
     say('DONE');
   })().catch(function (e) { say('EXCEPTION ' + e.message + '\n' + e.stack); say('DONE'); });
 })();
