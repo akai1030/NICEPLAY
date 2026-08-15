@@ -17,6 +17,19 @@ var el = function (id) { return document.getElementById(id); };
 
 var pvMode = 'matches';        /* 投影顯示：matches | rank */
 var drafting = null;           /* 名單暫存，還沒按「開始比賽」 */
+var applyingRemote = false;    /* 正在套用伺服器來的狀態，這時候不要再推回去 */
+
+var SRV_KEY = 'niceplay.server';
+var net = window.Net.create({
+  server: localStorage.getItem(SRV_KEY) || '',
+  onState: function (remote, role) {
+    /* 伺服器來的整份狀態直接取代本機。主控與加入者都吃這條，
+       所以「傳整份快照」的自癒特性在兩邊都成立。 */
+    applyingRemote = true;
+    try { store.replace(remote); } finally { applyingRemote = false; }
+  },
+  onStatus: function (s) { paintNet(s); }
+});
 
 /* ── 小工具 ─────────────────────────────────────────── */
 function esc(s) {
@@ -285,6 +298,12 @@ el('matchList').addEventListener('click', function (e) {
   if (!d || d.classList.contains('bye') || !d.dataset.t) return;
   var table = d.dataset.t, want = d.dataset.r;
   var st = store.get(), r = currentRound(st);
+
+  if (net.role === 'guest') {
+    /* 加入者不改本機，送給伺服器；伺服器套用完會把新狀態推回來 */
+    net.sendResult(r, table, want).catch(function () {});
+    return;
+  }
   store.commit(function (s) {
     s.matches.forEach(function (m) {
       if (m.round === r && m.table === table) m.result = (m.result === want) ? null : want;
@@ -352,6 +371,49 @@ el('btnPrint').onclick = function () {
   el('tRank').classList.add('print-me');
   setTimeout(function () { window.print(); setTimeout(function () {
     el('tRank').classList.remove('print-me'); }, 500); }, 60);
+};
+
+/* ── 連線 ─────────────────────────────────────────────
+   開房＝這臺當主控，配對與下一輪都在這裡算；
+   加入＝只能回報勝負。房號即權限，不需要帳號。      */
+function paintNet(st) {
+  var pill = el('netPill');
+  var role = st.role;
+  pill.hidden = (role === 'off');
+  pill.className = 'netpill ' + (st.bad ? 'bad' : role);
+  pill.textContent = role === 'off' ? ''
+    : (role === 'host' ? '主控 ' : '加入 ') + st.code + (st.online ? '' : ' · 斷線');
+
+  el('netOff').hidden = (role !== 'off');
+  el('netOn').hidden = (role === 'off');
+  el('roomCode').textContent = st.code || '——';
+  el('roomHint').innerHTML = role === 'host'
+    ? '把這六碼唸給店員，他在自己手機打開同一個網址、輸入房號就進來了。<br>' +
+      '<b>這臺是主控</b>：配對、下一輪、改設定都在這裡做。'
+    : '<b>你是加入者</b>：可以回報勝負，配對與下一輪由主控那臺決定。';
+  document.body.classList.toggle('guest', role === 'guest');
+  if (st.msg) toast(st.msg, st.bad);
+}
+
+el('fServer').oninput = function () {
+  var v = el('fServer').value.trim();
+  localStorage.setItem(SRV_KEY, v);
+  net.setServer(v);
+};
+
+el('btnHost').onclick = function () {
+  if (!el('fServer').value.trim()) { toast('先填房間伺服器位址', true); return; }
+  net.host(store.get()).catch(function (e) { toast('開房失敗：' + e.message, true); });
+};
+el('btnJoin').onclick = function () {
+  if (!el('fServer').value.trim()) { toast('先填房間伺服器位址', true); return; }
+  net.join(el('fJoin').value).then(function () {
+    goTab('tPlay');
+  }).catch(function (e) { toast('加入失敗：' + e.message, true); });
+};
+el('btnLeave').onclick = function () {
+  if (!confirmOnce('leave', '離線之後這臺就變回單機，其他裝置看不到你的操作 —— 再按一次確定')) return;
+  net.leave();
 };
 
 /* ── 主題 ─────────────────────────────────────────────
@@ -647,7 +709,13 @@ function tick() {
 store.subscribe(function (st) {
   if (!fillForm._once) { fillForm(st); fillForm._once = true; }
   render(st);
+  /* 主控端：本機一有變動就把整份狀態推上去。
+     applyingRemote 擋掉「收到推送 → 套用 → 又推回去」的迴圈。 */
+  if (!applyingRemote && net.role === 'host') net.pushState(st);
 });
+
+el('fServer').value = localStorage.getItem(SRV_KEY) || '';
+net.resume();
 ['fFormat', 'fNaming'].forEach(function (id) { el(id).onchange = syncFormatFields; });
 ['fTables', 'fCustom'].forEach(function (id) { el(id).oninput = function () { updateTableHint(); }; });
 

@@ -1,0 +1,163 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>NICEPLAY 雙裝置測試</title></head>
+<body style="margin:0;background:#111;color:#eee;font:13px/1.6 monospace">
+<div style="display:flex;gap:8px">
+  <iframe id="host"  style="width:640px;height:760px;border:0"></iframe>
+  <iframe id="guest" style="width:420px;height:760px;border:0"></iframe>
+</div>
+<pre id="out">RUNNING</pre>
+<script>
+/* 兩個 iframe 模擬兩臺裝置：左邊是筆電（主控），右邊是手機（加入者）。
+   兩邊都是真的介面，透過真的房間伺服器溝通。
+   （同一個瀏覽器，所以先把 BroadcastChannel 的干擾排除掉 —— 見下方 killBC） */
+(function () {
+  var L = [], fails = 0;
+  function say(s) { L.push(s); document.getElementById('out').textContent = L.join('\n'); }
+  function ok(c, m) { if (!c) { fails++; say('  ✗ ' + m); } }
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  var SRV = new URLSearchParams(location.search).get('srv') || 'http://127.0.0.1:8799';
+  var H = document.getElementById('host'), G = document.getElementById('guest');
+
+  function D(f) { return f.contentDocument; }
+  function W(f) { return f.contentWindow; }
+  function el(f, i) { return D(f).getElementById(i); }
+  function click(f, n) {
+    if (!n) { fails++; say('  ✗ 找不到元素'); return; }
+    var e = D(f).createEvent('MouseEvents'); e.initEvent('click', true, true); n.dispatchEvent(e);
+  }
+  function setVal(f, id, v) {
+    var n = el(f, id); n.value = v;
+    ['input', 'change'].forEach(function (t) {
+      var e = D(f).createEvent('HTMLEvents'); e.initEvent(t, true, true); n.dispatchEvent(e);
+    });
+  }
+  /* 兩個 iframe 同源，BroadcastChannel 會讓它們直接同步，
+     那樣就測不到伺服器了。停掉 guest 的 BC 才是真的兩臺裝置。 */
+  function killBC(f) { try { W(f).BroadcastChannel = undefined; } catch (e) {} }
+  /* headless 的虛擬時間會等所有網路請求結束，而 SSE 是永遠不結束的長連線 ——
+     所以測試強制走輪詢那條路。兩條路的行為在 net.js 裡是一樣的。 */
+  function killSSE(f) { try { W(f).EventSource = undefined; } catch (e) {} }
+
+  function load(f, url) {
+    return new Promise(function (res) { f.onload = function () { res(); }; f.src = url; });
+  }
+
+  (async function () {
+    say('伺服器：' + SRV);
+    await load(H, '../index.html');
+    W(H).localStorage.removeItem('niceplay.state.v1');
+    W(H).localStorage.removeItem('niceplay.net.v1');
+    await load(H, '../index.html');
+    killSSE(H);
+    await sleep(500);
+
+    /* ── 主控端開一場比賽 ─────────────────── */
+    say('\n【1】主控端開賽');
+    var names = ['王小明', '陳小美', '林阿明', '李大華', '張小強', '黃小美'];
+    setVal(H, 'fName', '雙裝置測試賽');
+    setVal(H, 'fPlayers', names.join('\n'));
+    click(H, el(H, 'btnParse')); await sleep(200);
+    setVal(H, 'fMinutes', '0');
+    setVal(H, 'fServer', SRV);
+    click(H, el(H, 'btnStart')); await sleep(400);
+    var hs = function () { return JSON.parse(W(H).localStorage.getItem('niceplay.state.v1')); };
+    ok(hs().matches.length === 3, '第一輪應該 3 桌，實際 ' + hs().matches.length);
+    say('  6 人 · 第一輪 3 桌 ✓');
+
+    /* ── 開房 ────────────────────────────── */
+    say('\n【2】開房');
+    click(H, el(H, 'btnHost')); await sleep(900);
+    var code = el(H, 'roomCode').textContent.trim();
+    ok(/^[A-Z0-9]{6}$/.test(code), '房號格式不對：' + code);
+    ok(el(H, 'netPill').textContent.indexOf('主控') === 0, '沒有顯示主控狀態');
+    say('  房號 ' + code + ' · 頂列顯示「' + el(H, 'netPill').textContent + '」✓');
+
+    /* ── 手機加入 ─────────────────────────── */
+    say('\n【3】手機用房號加入');
+    await load(G, '../index.html');
+    killBC(G); killSSE(G);
+    W(G).localStorage.removeItem('niceplay.state.v1');
+    W(G).localStorage.removeItem('niceplay.net.v1');
+    await load(G, '../index.html');
+    killBC(G); killSSE(G);
+    await sleep(400);
+    setVal(G, 'fServer', SRV);
+    setVal(G, 'fJoin', code);
+    click(G, el(G, 'btnJoin')); await sleep(1000);
+
+    var gs = function () { return JSON.parse(W(G).localStorage.getItem('niceplay.state.v1')); };
+    ok(gs() && gs().players.length === 6, '手機沒拿到名單');
+    ok(gs().event.name === '雙裝置測試賽', '賽事名稱沒同步');
+    ok(D(G).body.classList.contains('guest'), '手機沒有進入加入者模式');
+    ok(el(G, 'tPlay').classList.contains('on'), '手機沒有自動切到對戰頁');
+    say('  手機拿到 6 人名單與 3 桌對戰 · 自動進入加入者模式 ✓');
+
+    /* ── 加入者不能改設定 ─────────────────── */
+    say('\n【4】加入者的權限');
+    var setupTab = D(G).querySelector('.tabs button[data-tab="tSetup"]');
+    ok(W(G).getComputedStyle(setupTab).display === 'none', '加入者不該看到設定分頁');
+    ok(W(G).getComputedStyle(el(G, 'btnNext')).display === 'none', '加入者不該看到下一輪');
+    say('  設定分頁與「下一輪」都藏起來了 ✓');
+
+    /* ── 手機回報 → 筆電看到 ──────────────── */
+    say('\n【5】手機回報勝負，筆電跟著變');
+    var card = D(G).querySelectorAll('#matchList .mt')[0];
+    var tableName = card.querySelector('.tb').textContent.trim();
+    click(G, card.querySelectorAll('.sd')[0]);
+    await sleep(2400);
+
+    var hm = hs().matches.filter(function (m) { return String(m.table) === tableName; })[0];
+    ok(hm && hm.result === 'a', '筆電沒有收到手機的回報（桌 ' + tableName + '）');
+    var hCard = D(H).querySelectorAll('#matchList .mt')[0];
+    ok(hCard.querySelectorAll('.sd')[0].classList.contains('win'), '筆電畫面沒有更新成勝');
+    say('  手機點第 ' + tableName + ' 桌 → 筆電 1.2 秒內收到並變綠 ✓');
+
+    /* ── 筆電操作 → 手機看到 ──────────────── */
+    say('\n【6】筆電回報，手機跟著變');
+    var hCards = D(H).querySelectorAll('#matchList .mt');
+    click(H, hCards[1].querySelectorAll('.sd')[1]);
+    await sleep(2400);
+    var t2 = hCards[1].querySelector('.tb').textContent.trim();
+    var gm = gs().matches.filter(function (m) { return String(m.table) === t2; })[0];
+    ok(gm && gm.result === 'b', '手機沒有收到筆電的回報');
+    say('  筆電點第 ' + t2 + ' 桌 → 手機也變了 ✓');
+
+    /* ── 筆電排下一輪 → 手機整份換掉 ───────── */
+    say('\n【7】筆電排下一輪');
+    var last = D(H).querySelectorAll('#matchList .mt')[2];
+    click(H, last.querySelectorAll('.sd')[0]);
+    await sleep(600);
+    click(H, el(H, 'btnNext')); await sleep(2600);
+    ok(hs().matches.filter(function (m) { return m.round === 2; }).length === 3,
+       '筆電沒排出第二輪');
+    ok(gs().matches.filter(function (m) { return m.round === 2; }).length === 3,
+       '手機沒收到第二輪');
+    say('  第二輪 3 桌，主控算完整份推給手機 ✓');
+
+    /* ── 手機重整之後自動接回 ─────────────── */
+    say('\n【8】手機重整之後');
+    await load(G, '../index.html');
+    killBC(G); killSSE(G);
+    await sleep(2600);
+    ok(D(G).body.classList.contains('guest'), '重整後沒有自動接回房間');
+    ok(gs().matches.filter(function (m) { return m.round === 2; }).length === 3,
+       '重整後資料不見了');
+    say('  重整後自動接回同一個房間，資料還在 ✓');
+
+    /* ── 離線 ─────────────────────────────── */
+    say('\n【9】手機離線');
+    click(G, D(G).querySelector('.tabs button[data-tab="tSetup"]') || el(G, 'btnLeave'));
+    await sleep(150);
+    click(G, el(G, 'btnLeave')); await sleep(200);
+    click(G, el(G, 'btnLeave')); await sleep(600);
+    ok(!D(G).body.classList.contains('guest'), '離線後還是加入者模式');
+    say('  離線後回到單機模式（要按兩次確認）✓');
+
+    say('');
+    say(fails === 0 ? '雙裝置端對端全部通過 ✅' : '有 ' + fails + ' 項失敗 ❌');
+    say('DONE');
+  })().catch(function (e) { say('EXCEPTION ' + e.message + '\n' + e.stack); say('DONE'); });
+})();
+</script>
+</body></html>

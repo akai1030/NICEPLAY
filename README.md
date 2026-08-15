@@ -1,7 +1,6 @@
-# NICEPLAY
+# 連線整合賽事次世代系統
 
-**Networked Integrated Competition & Event Platform for League And Yomi**
-連線整合賽事次世代系統
+**NICEPLAY** — Networked Integrated Competition & Event Platform for League And Yomi
 
 一臺筆電就能辦一場比賽。打開網址、貼上名單、按開始 —— **全程不需要網路、不需要帳號、不需要安裝。**
 
@@ -42,10 +41,16 @@
 - **投影模式**：按「放大投影」全螢幕，字級依桌數自動縮放，Esc 離開
 - 排名表可直接列印或存成 PDF
 
+**多裝置**
+- 開房拿到六碼房號，其他裝置輸入就加入 —— **不用註冊、不用帳號**
+- 手機當遙控：店員在店裡走動點勝負，電視自己更新
+- 主控算配對與下一輪，加入者只回報勝負（設定分頁對他隱藏，避免誤觸）
+- SSE 即時推送，斷了自動退回輪詢；重整會自動接回原本的房間
+
 **資料**
 - 存在瀏覽器本機，關掉再開還在
 - 匯出／匯入 JSON 存檔
-- 多視窗自動同步（控制視窗留在筆電、投影視窗拖到電視）
+- 同一臺電腦多視窗自動同步（控制留在筆電、投影拖到電視，不需要伺服器）
 
 ---
 
@@ -66,43 +71,81 @@ python3 -m http.server 8123
 # 開 http://localhost:8123
 ```
 
-### 控制與投影分開
+### 控制與投影分開（同一臺電腦）
 
-1. 在筆電開一個視窗操作
-2. 再開一個視窗、網址加上 `#present`，拖到接電視的那個顯示器
-3. 兩邊會自動同步（用瀏覽器內建的 BroadcastChannel，不需要伺服器）
+按「放大投影 ↗」會開一個新視窗，原分頁留著當控制台。把新視窗拖到接電視的
+那個顯示器、按裡面的「全螢幕」就完成了。兩邊用瀏覽器內建的 BroadcastChannel
+同步，**不需要伺服器**。
+
+### 手機遙控（多臺裝置）
+
+需要一個房間伺服器（見下面「房間伺服器」）。
+
+1. 筆電：在設定頁填入房間伺服器位址 → 按「開房（我是主控）」→ 拿到六碼房號
+2. 手機：打開同一個網址 → 填同一個伺服器位址 → 輸入房號 → 加入
+3. 手機就能點勝負了，筆電與電視即時跟著變
+
+主控端負責配對、下一輪、改設定；加入者只能回報勝負。
+房號即權限，沒有帳號系統 —— 就像會議室的連結。
 
 ---
 
 ## 部署
 
+### 前端（必要）
+
 純靜態，丟哪都能跑。
 
-**Zeabur**：Add Service → Git → 選這個 repo，`zbpack.json` 已經設好靜態部署，
-接著在 Domains 綁你的網域就好。
+**Zeabur**：Add Service → Git → 選這個 repo。`zbpack.json` 已經設好靜態部署，
+接著在 Domains 綁你的網域就好。不需要資料庫、不需要環境變數。
 
 **其他**：Cloudflare Pages、Netlify、GitHub Pages、Vercel 都是直接指到根目錄即可。
+
+### 房間伺服器（選配，只有要手機遙控才需要）
+
+在**同一個 Zeabur 專案**再 Add 一個 Service，Root Directory 設成 `server`。
+Zeabur 會從 `server/package.json` 認出 Node 並執行 `npm start`。
+
+| 環境變數 | 預設 | 說明 |
+|---|---|---|
+| `PORT` | 8787 | Zeabur 會自動帶 |
+| `DATABASE_URL` | 無 | 有就寫 Postgres，沒有就放記憶體（重啟會清空） |
+| `ROOM_TTL_HOURS` | 36 | 超過這麼久沒動的房間會被清掉 |
+
+要接 Zeabur 的 Managed Postgres 就把它的連線字串填進 `DATABASE_URL`，
+資料表會自己建。**不接資料庫也能跑** —— 一天的比賽用記憶體完全夠，
+只是伺服器重啟時進行中的房間會消失（各裝置本機還有資料，重開房即可）。
+
+伺服器位址填進前端設定頁的「房間伺服器位址」欄位，會記在瀏覽器裡。
 
 ---
 
 ## 開發
 
 ```
-index.html          外殼
-src/engine.js       賽制引擎（純函式，不碰畫面與儲存）
-src/store.js        狀態：localStorage + BroadcastChannel
-src/ui.js           介面
-src/style.css       視覺
-sw.js               Service Worker（離線快取）
-test/engine.test.js 引擎單元測試
-test/e2e.html       端對端測試（在瀏覽器裡驅動真的介面跑完一場）
+index.html            外殼
+src/engine.js         賽制引擎（純函式，不碰畫面、儲存與網路）
+src/store.js          狀態：localStorage + BroadcastChannel
+src/net.js            連線層：開房／加入／SSE／輪詢備援（選配）
+src/ui.js             介面
+src/style.css         視覺（語意 token，深淺兩個主題）
+sw.js                 Service Worker（離線快取）
+server/index.js       房間伺服器（Node 無框架，Postgres 選配）
+test/engine.test.js   引擎單元測試（11 組）
+test/e2e.html         單機端對端：跑完四輪瑞士 + 四強 + 決賽
+test/duo.html         雙裝置端對端：筆電主控 + 手機加入
+server/test.js        伺服器測試（8 組，含併發回報）
 ```
 
 沒有建置步驟、沒有相依套件、沒有框架。原生 ES5 + 原生 DOM。
 
 ```bash
-node test/engine.test.js         # 引擎 11 組測試
-python3 -m http.server 8123      # 然後開 /test/e2e.html 看端對端
+node test/engine.test.js         # 引擎 11 組
+node server/test.js              # 伺服器 8 組（會自己起一個在 8799）
+
+python3 -m http.server 8123      # 然後瀏覽器開：
+#   /test/e2e.html                          單機端對端
+#   /test/duo.html?srv=http://127.0.0.1:8799  雙裝置（要先起房間伺服器）
 ```
 
 `engine.js` 是純函式，也可以單獨拿去用：

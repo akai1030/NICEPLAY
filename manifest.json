@@ -1,7 +1,7 @@
 {
   "name": "NICEPLAY 連線整合賽事次世代系統",
   "short_name": "NICEPLAY",
-  "description": "開源的離線賽事系統。瑞士制、單敗淘汰、循環賽，一臺筆電就能辦一場比賽。",
+  "description": "Networked Integrated Competition & Event Platform for League And Yomi — 離線可用的賽事系統，瑞士制、單敗淘汰、循環賽。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -10,6 +10,11 @@
   "theme_color": "#000000",
   "lang": "zh-Hant",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }

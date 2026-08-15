@@ -1,0 +1,16 @@
+{
+  "name": "niceplay-rooms",
+  "version": "0.1.0",
+  "description": "NICEPLAY 房間伺服器：讓多臺裝置看同一場比賽。六碼房號即權限，不需要帳號。",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "engines": { "node": ">=18" },
+  "optionalDependencies": {
+    "pg": "^8.13.1"
+  },
+  "license": "MIT"
+}

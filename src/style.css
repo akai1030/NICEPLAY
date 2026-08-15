@@ -87,11 +87,23 @@ body { display: flex; flex-direction: column; }
   border-bottom: 2px solid var(--line-hard);
   padding: 10px 14px; display: flex; align-items: center; gap: 12px;
 }
-.brand {
-  font-family: var(--f-mono); font-size: 12px; font-weight: 700;
-  letter-spacing: .22em; color: var(--accent-fg); white-space: nowrap;
-}
-.brand span { color: var(--faint); letter-spacing: .12em; }
+/* 品牌鎖定：中文為主、英文為輔。
+   英文短名放在上面當眉標，中文全名是實際辨識的那一行。 */
+.brand { display: flex; flex-direction: column; gap: 1px; white-space: nowrap; }
+.brand .en { font-family: var(--f-mono); font-size: 9.5px; font-weight: 700;
+             letter-spacing: .34em; color: var(--accent-fg); }
+.brand .cn { font-size: 15px; font-weight: 700; letter-spacing: .04em; color: var(--fg); }
+@media (max-width: 720px) { .brand .cn { font-size: 13px; letter-spacing: 0; } }
+@media (max-width: 520px) { .brand .cn { display: none; } }
+
+/* 設定頁最上面的識別區：第一次打開的人先看到這個 */
+.hero { padding: 6px 0 22px; margin-bottom: 22px; border-bottom: 2px solid var(--fg); }
+.hero h1 { font-size: clamp(24px, 4.6vw, 34px); font-weight: 900;
+           letter-spacing: .02em; line-height: 1.2; }
+.hero .mark { font-family: var(--f-mono); font-size: 12px; font-weight: 700;
+              letter-spacing: .36em; color: var(--accent-fg); margin-top: 10px; }
+.hero .full { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .04em;
+              color: var(--faint); margin-top: 4px; line-height: 1.5; }
 .evt { flex: 1; min-width: 0; font-size: 14px; color: var(--dim);
        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .clock { font-family: var(--f-mono); font-size: 15px; color: var(--dim); }
@@ -251,6 +263,23 @@ table.rank tr.out td.l { text-decoration: line-through; }
          font-size: 12px; color: var(--dim); background: transparent; min-height: 30px; }
 .dropb.on { border-color: var(--red); color: var(--danger-fg); }
 
+/* ── 連線 ───────────────────────────────────────────── */
+.netpill { font-family: var(--f-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .12em; padding: 4px 10px; border-radius: 999px;
+  border: 1.5px solid var(--line-hard); color: var(--dim); white-space: nowrap; }
+.netpill.host  { border-color: var(--lime); color: var(--accent-fg); }
+.netpill.guest { border-color: var(--blue); color: var(--blue-soft); }
+.netpill.bad   { border-color: var(--red); color: var(--danger-fg); }
+.roomcode { font-family: var(--f-mono); font-size: 30px; font-weight: 700;
+  letter-spacing: .3em; color: var(--accent-fg); background: var(--surface);
+  border: 2px solid var(--lime); border-radius: var(--r);
+  padding: 8px 6px 8px 16px; flex: 0 0 auto; }
+
+/* 加入者（手機）只回報勝負，其他都不給碰 —— 避免在店裡誤觸改設定 */
+body.guest .tabs button[data-tab="tSetup"] { display: none; }
+body.guest #btnNext, body.guest #btnRepair, body.guest #btnTimer { display: none; }
+body.guest .dropb { display: none; }
+
 /* ── 危險區 ─────────────────────────────────────────── */
 .danger-zone { margin-top: 26px; padding: 14px; border: 2px dashed var(--red);
                border-radius: var(--r); }
@@ -287,6 +316,9 @@ body.present #present { display: flex; }
          font-size: 1.4vw; background: var(--bg); }
 .pv-ft .k { font-family: var(--f-mono); font-size: .9vw; letter-spacing: .2em;
             text-transform: uppercase; color: var(--label-fg); }
+.pv-ft .k em { font-style: normal; font-family: var(--f-cn); font-size: 1.05vw;
+               letter-spacing: .02em; color: var(--fg); margin-left: .7vw;
+               text-transform: none; font-weight: 700; }
 .pv-ft .grow { flex: 1; }
 .pv-ft .exit { font-size: .95vw; color: var(--faint); }
 .pv-ft button { min-height: 2.4vw; font-size: .95vw; padding: 0 1vw;

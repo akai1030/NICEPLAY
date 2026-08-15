@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <title>NICEPLAY · 連線整合賽事次世代系統</title>
-<meta name="description" content="開源的離線賽事系統。瑞士制、單敗淘汰、循環賽，一臺筆電就能辦一場比賽。">
+<meta name="description" content="NICEPLAY — Networked Integrated Competition &amp; Event Platform for League And Yomi。開源的離線賽事系統：瑞士制、單敗淘汰、循環賽，一臺筆電就能辦一場比賽。">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%23000'/><text x='32' y='45' font-size='40' font-family='serif' fill='%23B0D000' text-anchor='middle'>N</text></svg>">
 <link rel="stylesheet" href="src/style.css">
@@ -13,8 +13,12 @@
 <body>
 
 <header class="top">
-  <div class="brand">NICEPLAY<span> ／ 賽事台</span></div>
+  <div class="brand">
+    <span class="en">NICEPLAY</span>
+    <span class="cn">連線整合賽事次世代系統</span>
+  </div>
   <div class="evt" id="evtLabel">尚未設定賽事</div>
+  <span class="netpill" id="netPill" hidden></span>
   <div class="clock num" id="wallClock">--:--</div>
   <button class="sm" id="btnTheme" title="切換淺色／深色">◐</button>
   <button class="sm main" id="btnPresent">放大投影 ↗</button>
@@ -28,6 +32,12 @@
 
 <!-- ── 設定 ─────────────────────────────────────────── -->
 <div class="pane on" id="tSetup"><div class="wrap">
+
+  <div class="hero">
+    <h1>連線整合賽事次世代系統</h1>
+    <div class="mark">NICEPLAY</div>
+    <div class="full">Networked Integrated Competition &amp; Event Platform for League And Yomi</div>
+  </div>
 
   <h2 class="sec">Event<em>賽事資訊</em></h2>
   <div class="row">
@@ -94,6 +104,28 @@
     <label class="fld"><span>每輪分鐘（0＝不計時）</span><input type="number" id="fMinutes" min="0" max="240"></label>
   </div>
 
+  <h2 class="sec sec-gap">Devices<em>多裝置 · 手機遙控</em></h2>
+  <div class="hint" style="margin-top:0">
+    不開房也能辦完整場比賽 —— 這一區只在你要<b>用手機回報勝負</b>、
+    或<b>換一臺電腦繼續</b>時才需要。開房之後把六碼房號唸給店員，他在自己手機打開同一個網址、
+    輸入房號就進來了。
+  </div>
+  <div class="row" style="margin-top:10px">
+    <label class="fld" style="flex:2 1 260px"><span>房間伺服器位址</span>
+      <input type="text" id="fServer" placeholder="https://你的房間伺服器"></label>
+  </div>
+  <div class="row" id="netOff">
+    <button class="sm main" id="btnHost" style="flex:1 1 150px">開房（我是主控）</button>
+    <input type="text" id="fJoin" placeholder="輸入六碼房號" maxlength="6"
+           style="flex:1 1 130px;text-transform:uppercase">
+    <button class="sm" id="btnJoin" style="flex:0 0 100px">加入</button>
+  </div>
+  <div class="row" id="netOn" hidden>
+    <div class="roomcode" id="roomCode">——</div>
+    <div class="hint" style="flex:1 1 200px;margin:0" id="roomHint"></div>
+    <button class="sm danger" id="btnLeave" style="flex:0 0 110px">離線</button>
+  </div>
+
   <div class="row sec-gap">
     <button class="go big" id="btnStart" style="flex:1 1 240px">開始比賽</button>
     <button class="sm" id="btnExport">匯出存檔</button>
@@ -151,7 +183,7 @@
   </div>
   <div class="pv-body" id="pvBody"></div>
   <div class="pv-ft">
-    <span class="k">NICEPLAY</span>
+    <span class="k">NICEPLAY<em>連線整合賽事次世代系統</em></span>
     <span class="grow" id="pvFoot"></span>
     <span class="exit">點畫面切換對戰表／名次　·　1 2 F Esc</span>
     <button class="sm" id="btnFull">全螢幕</button>
@@ -163,6 +195,7 @@
 
 <script src="src/engine.js"></script>
 <script src="src/store.js"></script>
+<script src="src/net.js"></script>
 <script src="src/ui.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
