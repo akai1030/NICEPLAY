@@ -37,15 +37,16 @@
       <input type="text" id="fDate" placeholder="2026-08-15"></label>
   </div>
 
-  <h2 class="sec sec-gap">Players<em>參賽名單</em></h2>
-  <textarea id="fPlayers" placeholder="一行一位選手，前面可以有編號也可以沒有：&#10;1 王小明&#10;2 陳小美&#10;林阿明"></textarea>
+  <h2 class="sec sec-gap">Players<em>參賽名單 · 一次貼上全部，之後補在最後面</em></h2>
+  <textarea id="fPlayers" placeholder="一次把全部人貼進來，一行一位：&#10;&#10;王小明&#10;陳小美&#10;林阿明&#10;&#10;前面有編號也沒關係，會自動重新排號。&#10;之後要加人，就在最後補一行再按「更新名單」。"></textarea>
   <div class="row" style="margin-top:8px">
     <button class="sm go" id="btnParse">更新名單</button>
     <span class="hint" id="playerMsg" style="margin:0"></span>
   </div>
   <div class="hint" style="margin-top:2px">
-    這個框永遠是<b>完整名單</b>。要加人就在最後補一行再按一次；
-    比賽開始後加人只會新增，不會動到已經打完的成績（要移除請用排名頁的「退賽」）。
+    這個框<b>永遠等於完整名單</b> —— 按下按鈕之後它會把整份名單重新寫回來，
+    所以加人只要在最後補一行，原本的人不會不見。<br>
+    比賽開始後再按，<b>只會新增</b>，已經打完的成績不受影響；要移除某個人請用排名頁的「退賽」。
   </div>
   <div class="roster" id="rosterView" style="margin-top:10px"></div>
 
