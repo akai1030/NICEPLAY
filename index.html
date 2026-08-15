@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608160221">
+<link rel="stylesheet" href="src/style.css?v=202608160237">
 </head>
 <body>
 
@@ -463,11 +463,11 @@
 
 <div id="toast"></div>
 
-<script src="src/qr.js?v=202608160221"></script>
-<script src="src/engine.js?v=202608160221"></script>
-<script src="src/store.js?v=202608160221"></script>
-<script src="src/net.js?v=202608160221"></script>
-<script src="src/ui.js?v=202608160221"></script>
+<script src="src/qr.js?v=202608160237"></script>
+<script src="src/engine.js?v=202608160237"></script>
+<script src="src/store.js?v=202608160237"></script>
+<script src="src/net.js?v=202608160237"></script>
+<script src="src/ui.js?v=202608160237"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -475,7 +475,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608160221').catch(function () {});
+    navigator.serviceWorker.register('sw.js?v=202608160237').catch(function () {});
   });
 }
 </script>

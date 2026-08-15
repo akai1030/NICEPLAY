@@ -1,15 +1,23 @@
 /*
- * qr.js — 零相依的 QR Code 產生器（ES5，可直接用 <script> 載入）
+ * qr.js — 自己寫的 QR Code 產生器，零外部相依（ES5 語法，可直接用 <script> 載入）
  *
- * 做什麼：把字串編成 QR Code，輸出 0/1 二維矩陣或單路徑 SVG。
- * 只支援 byte mode（UTF-8），版本 1–40 自動選，四種容錯等級 L/M/Q/H。
+ * 為什麼不用現成套件：這支程式跑在活動現場的機器上，網路不一定接得通，
+ * 頁面也不允許載入任何外部資源或第三方套件。所以從資料編碼、
+ * Reed-Solomon 錯誤更正、矩陣佈局到遮罩評分，整套流程都寫在這個檔案裡，
+ * 完全離線也能即時產生入場用的 QR Code。
  *
- * 為什麼自己寫：現場機器不接外網，也不允許載入任何外部資源或套件，
- * 所以編碼、Reed-Solomon、矩陣佈局、遮罩評分全部在這個檔案裡完成。
+ * 涵蓋範圍：只做位元組模式（byte mode，內容以 UTF-8 編碼），
+ * 版本 1 到 40 依資料長度自動選擇，容錯等級 L、M、Q、H 四種，
+ * 八種遮罩全部試算後取懲罰分數最低的一種。
  *
  * 用法：
- *   QR.matrix(text, ecc)        -> [[0|1, ...], ...]，1 = 黑模組
- *   QR.svg(text, opts)          -> SVG 字串（不含 XML 宣告）
+ *   QR.matrix(text, ecc)
+ *     回傳二維陣列，1 是黑模組、0 是白模組；ecc 省略時為 'M'。
+ *   QR.svg(text, opts)
+ *     回傳 SVG 字串，不含 XML 宣告，可直接塞進 innerHTML。
+ *     opts 可給：size（整張邊長像素，預設每個模組 4 像素）、
+ *     margin（周圍留白的模組數，預設 4）、ecc（容錯等級，預設 'M'）、
+ *     dark（前景色，預設 #000）、light（背景色，預設 #fff）。
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -145,7 +153,7 @@
     var capacity = dataCodewords(ver, e) * 8;
     var bb = new BitBuffer(), i, pad, codewords;
 
-    bb.put(4, 4);                              // byte mode
+    bb.put(4, 4);                              // 模式指示碼：位元組模式
     bb.put(bytes.length, charCountBits(ver));
     for (i = 0; i < bytes.length; i++) bb.put(bytes[i], 8);
 
