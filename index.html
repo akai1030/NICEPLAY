@@ -3,19 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#0B0D12">
 <title>NICEPLAY · 連線整合賽事次世代系統</title>
 <meta name="description" content="NICEPLAY — Networked Integrated Competition &amp; Event Platform for League And Yomi。開源的離線賽事系統：瑞士制、單敗淘汰、循環賽，一臺筆電就能辦一場比賽。">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%23000'/><text x='32' y='45' font-size='40' font-family='serif' fill='%23B0D000' text-anchor='middle'>N</text></svg>">
+<meta name="apple-mobile-web-app-title" content="NICEPLAY">
+<meta property="og:type" content="website">
+<meta property="og:title" content="NICEPLAY 連線整合賽事次世代系統">
+<meta property="og:description" content="貼上名單就能開賽 —— 瑞士制配對、即時名次、投影畫面。免註冊、離線可用、開源免費。">
+<meta property="og:image" content="https://niceplay.transtation.org/assets/share.png">
+<meta property="og:url" content="https://niceplay.transtation.org/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" sizes="32x32" href="assets/favicon-32.png">
+<link rel="icon" sizes="64x64" href="assets/favicon-64.png">
+<link rel="apple-touch-icon" href="assets/favicon-180.png">
 <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
 
 <header class="top">
   <div class="brand">
-    <span class="en">NICEPLAY</span>
-    <span class="cn">連線整合賽事次世代系統</span>
+    <i class="mk"></i>
+    <span class="tx">
+      <i class="wm"></i>
+      <span class="cn">連線整合賽事次世代系統</span>
+    </span>
   </div>
   <div class="evt" id="evtLabel">尚未設定賽事</div>
   <span class="netpill" id="netPill" hidden></span>
@@ -34,9 +46,11 @@
 <div class="pane on" id="tSetup"><div class="wrap">
 
   <div class="hero">
-    <h1>連線整合賽事次世代系統</h1>
-    <div class="mark">NICEPLAY</div>
-    <div class="full">Networked Integrated Competition &amp; Event Platform for League And Yomi</div>
+    <i class="lock"></i>
+    <div class="motto">
+      Every Match <b>Connects.</b> Every Play <b>Counts.</b>
+      <span>CONNECT · COMPETE · PLAY</span>
+    </div>
   </div>
 
   <h2 class="sec">Event<em>賽事資訊</em></h2>
@@ -120,10 +134,23 @@
            style="flex:1 1 130px;text-transform:uppercase">
     <button class="sm" id="btnJoin" style="flex:0 0 100px">加入</button>
   </div>
-  <div class="row" id="netOn" hidden>
-    <div class="roomcode" id="roomCode">——</div>
-    <div class="hint" style="flex:1 1 200px;margin:0" id="roomHint"></div>
-    <button class="sm danger" id="btnLeave" style="flex:0 0 110px">離線</button>
+  <div id="netOn" hidden>
+    <div class="codes">
+      <div class="codebox staff">
+        <span class="lab">店員房號</span>
+        <b class="roomcode" id="roomCode">——</b>
+        <span class="sub">可以回報勝負</span>
+      </div>
+      <div class="codebox view" id="viewBox">
+        <span class="lab">選手查詢碼</span>
+        <b class="roomcode" id="viewCode">——</b>
+        <span class="sub">只能看 · 唸給選手</span>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="hint" style="flex:1 1 200px;margin:0" id="roomHint"></div>
+      <button class="sm danger" id="btnLeave" style="flex:0 0 110px">離線</button>
+    </div>
   </div>
 
   <div class="row sec-gap">
@@ -145,6 +172,14 @@
 
 <!-- ── 對戰 ─────────────────────────────────────────── -->
 <div class="pane" id="tPlay"><div class="wrap">
+  <!-- 選手查詢模式才會出現：挑自己的名字，之後就直接告訴你在第幾桌 -->
+  <div id="mePanel" hidden>
+    <div class="mebar" id="meBar" hidden></div>
+    <div class="row" id="mePick">
+      <span class="hint" style="margin:0;flex:0 0 auto">你是哪一位？</span>
+      <div class="roster" id="meList" style="flex:1 1 100%"></div>
+    </div>
+  </div>
   <div class="prog">
     <b id="progDone">0/0</b><span id="progRound">—</span>
     <div class="bar"><i id="progBar" style="width:0"></i></div>
@@ -183,12 +218,153 @@
   </div>
   <div class="pv-body" id="pvBody"></div>
   <div class="pv-ft">
-    <span class="k">NICEPLAY<em>連線整合賽事次世代系統</em></span>
+    <span class="k"><i class="mk"></i><i class="wm"></i><em>連線整合賽事次世代系統</em></span>
     <span class="grow" id="pvFoot"></span>
-    <span class="exit">點畫面切換對戰表／名次　·　1 2 F Esc</span>
+    <span class="exit">點畫面切換對戰表／名次　·　1 對戰表　2 名次　F 全螢幕　Esc 離開全螢幕</span>
     <button class="sm" id="btnFull">全螢幕</button>
     <button class="sm" id="btnClosePv">關閉投影窗</button>
   </div>
+</div>
+
+<!-- ── 使用手冊 ───────────────────────── -->
+<button id="btnBook">使用手冊</button>
+
+<div id="book">
+  <div class="bk-hd">
+    <i class="mk"></i>
+    <h2>使用手冊</h2>
+    <span class="grow"></span>
+    <button class="sm" id="btnBookPrint">列印／存成 PDF</button>
+    <button class="sm main" id="btnBookClose">關閉</button>
+  </div>
+
+  <div class="bk-body" id="bookBody"><div class="wrap">
+
+  <p class="bk-lede">
+    NICEPLAY 是跟著比賽跑的現場工具。<b>它幫你排對戰、算名次、還能投影給全場看</b>，
+    你只要把名單貼進去，之後每一輪點誰贏、再按「下一輪」。<br>
+    沒有帳號、不用安裝、<b>斷網也能跑完整場</b> —— 資料就存在這臺電腦的瀏覽器裡。
+  </p>
+
+  <div class="bk-who">
+    <div class="bk-card a"><span class="lab">Main</span>
+      <b>主控（你的筆電）</b>
+      <span>輸名單、按下一輪、控制投影。整場比賽只需要這一臺。</span></div>
+    <div class="bk-card b"><span class="lab">Staff</span>
+      <b>店員的手機（選配）</b>
+      <span>拿「店員房號」加入，可以幫忙點誰贏誰輸。</span></div>
+    <div class="bk-card c"><span class="lab">Player</span>
+      <b>選手的手機（選配）</b>
+      <span>拿「選手查詢碼」，只能看自己在第幾桌、現在第幾名。</span></div>
+  </div>
+
+  <div class="bk-step"><div class="no">1</div><div>
+    <h3>把網址打開</h3>
+    <p><span class="key">niceplay.transtation.org</span> —— 用 Chrome 或 Safari 都可以，不用安裝任何東西。</p>
+    <p>建議比賽前一天先開一次。手機可以按瀏覽器的「加到主畫面」，下次就像一個 App。</p>
+    <div class="bk-note"><b>現場斷網沒關係。</b>只要這臺電腦開過一次，之後沒網路也打得開，整場比賽都跑得完。</div>
+  </div></div>
+
+  <div class="bk-step"><div class="no">2</div><div>
+    <h3>貼名單</h3>
+    <p>在「參賽名單」那個大框裡，<b>一行一位</b>，一次把全部人貼進去，按「更新名單」。</p>
+    <p>前面有編號也沒關係，會自動重新排。名字中間有空白也讀得出來。</p>
+    <div class="bk-note"><b>中途有人報名？</b>
+      在同一個框的<b>最後面補一行</b>再按一次「更新名單」。原本的人跟已經打完的成績不會不見。</div>
+  </div></div>
+
+  <div class="bk-step"><div class="no">3</div><div>
+    <h3>選賽制、桌次、時間</h3>
+    <ul>
+      <li><b>瑞士制</b> —— 一般店賽就選這個。同分打同分、不會遇到同一個對手、人數單數自動輪空。</li>
+      <li><b>單敗淘汰</b> —— 輸一場就結束。</li>
+      <li><b>循環賽</b> —— 每個人都打過一次，適合小人數。</li>
+    </ul>
+    <p><b>輪數</b>留白會自動建議（8 人打3 輪、16 人打4 輪、32 人打5 輪）。
+       <b>桌號</b>可以是數字、字母，或自己打（例如 Q1, Q2）。
+       <b>主桌／直播桌</b>填了之後，那一桌在投影畫面會被框起來。</p>
+    <p><b>每輪分鐘</b>填 0 就不計時。實體卡牌賽常見是 25 分鐘。</p>
+  </div></div>
+
+  <div class="bk-step"><div class="no">4</div><div>
+    <h3>按「開始比賽」</h3>
+    <p>系統會直接排好第一輪，自動跳到「對戰」頁。把桌號念出來，或直接投影。</p>
+  </div></div>
+
+  <div class="bk-step"><div class="no">5</div><div>
+    <h3>投影給全場看</h3>
+    <p>右上角按 <span class="key">放大投影 ↗</span>，會開<b>新的一個視窗</b>，把它拖到投影機那一幕，再按「全螢幕」。</p>
+    <p><b>原本那個視窗不會變</b>，你繼續在上面操作，投影那邊會跟著同步。</p>
+    <p>投影畫面上：<span class="key">1</span> 對戰表、<span class="key">2</span> 即時名次、<span class="key">F</span> 全螢幕、<span class="key">Esc</span> 退出；點畫面也可以切。</p>
+  </div></div>
+
+  <div class="bk-step"><div class="no">6</div><div>
+    <h3>每一輪就重複這三件事</h3>
+    <ul>
+      <li>按 <span class="key">開始計時</span>，倒數會同步到投影畫面。</li>
+      <li>打完一桌就<b>點贏的那一邊</b>（點錯再點一次就取消）；平手點中間那個格。</li>
+      <li>全部回報完了，按 <span class="key">下一輪</span>。</li>
+    </ul>
+    <div class="bk-note"><b>建議的現場節奏：</b>時間到 → 給大家幾分鐘確認戰績 → 確認完才按「下一輪」。
+      按下去才會重新排位子，不會提前跑掉。</div>
+  </div></div>
+
+  <div class="bk-step"><div class="no">7</div><div>
+    <h3>讓店員用手機幫忙回報（選配）</h3>
+    <p>人多的時候，一個人跑全場點很累。在設定頁最下面按 <span class="key">開房（我是主控）</span>，
+       伺服器位址<b>已經預先填好了</b>，不用打。</p>
+    <p>開完會出現兩組六碼：</p>
+    <ul>
+      <li><b>店員房號</b> —— 念給幫忙的人。他用手機開同一個網址、把房號輸進去、按「加入」，就能點勝負了。</li>
+      <li><b>選手查詢碼</b> —— 見下一項。</li>
+    </ul>
+    <div class="bk-note warn"><b>排對戰、按下一輪永遠只在主控這臺。</b>
+      手機只能回報勝負，不會不小心把設定改掉。</div>
+  </div></div>
+
+  <div class="bk-step"><div class="no">8</div><div>
+    <h3>讓選手自己查桌號（選配）</h3>
+    <p>把<b>選手查詢碼</b>寫在白板上，或直接放在投影畫面旁邊。</p>
+    <p>選手用手機開同一個網址、輸這組碼、點一下自己的名字，
+       畫面就直接寫<b>「你在第 3 桌」</b>、目前第幾名、對手是誰。</p>
+    <div class="bk-note"><b>這組碼只能看。</b>就算有人想動手腳，伺服器也會直接擋下來 ——
+      可以放心公開貼出來。</div>
+  </div></div>
+
+  <div class="bk-step"><div class="no">9</div><div>
+    <h3>出狀況的時候</h3>
+    <ul>
+      <li><b>排錯了、有人臨時跑掉</b> → 對戰頁按「重排這一輪」。</li>
+      <li><b>有人退賽</b> → 排名頁點他旁邊的「退賽」。他打過的場次還算數，之後不再被排對。</li>
+      <li><b>電腦快沒電、想換一臺</b> → 按「匯出存檔」存一個檔，新電腦按「匯入存檔」。</li>
+      <li><b>不小心重整、瀏覽器關掉</b> → 直接重新打開網址，資料還在。</li>
+      <li><b>下一場比賽要重來</b> → 設定頁最下面「全部清除重來」。<b>先匯出存檔</b>再清。</li>
+    </ul>
+  </div></div>
+
+  <div class="bk-step"><div class="no">10</div><div>
+    <h3>名次怎麼算</h3>
+    <p>預設勝 3 分、平手 1 分、輸 0 分，輪空視同勝（這三個數字都可以自己改）。</p>
+    <p>同分的時候，依序比 <b>OMW%</b>（你打過的對手平均勝率）→ <b>OOMW%</b>（對手的對手）→ 選手編號。
+       這是實體卡牌賽的標準算法 —— <b>讓「一路碰到強手」的人排前面</b>。</p>
+  </div></div>
+
+  <div class="bk-step"><div class="no">11</div><div>
+    <h3>比完了</h3>
+    <p>排名頁按「列印／存成 PDF」，列印視窗裡選「存成 PDF」就有一份完整名次表可以發給選手。</p>
+  </div></div>
+
+  <div class="bk-step"><div class="no plain">?</div><div>
+    <h3>常見問題</h3>
+    <p><b>要不要先註冊？</b>不用。沒有帳號這回事，打開就能用。</p>
+    <p><b>資料存在哪？</b>存在這臺電腦的瀏覽器裡，不會傳到別人那邊。
+       只有你主動「開房」的時候，才會把這一場的對戰表放到伺服器上給手機看，而且 36 小時後自動消掉。</p>
+    <p><b>一場最多幾人？</b>沒有上限。512 人九輪也是一瞬間排完。</p>
+    <p><b>可以自己架嗎？</b>可以，這是開源的（MIT）：
+       <span class="key">github.com/akai1030/NICEPLAY</span></p>
+  </div></div>
+
+  </div></div>
 </div>
 
 <div id="toast"></div>

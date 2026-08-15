@@ -1,8 +1,13 @@
 /* ============================================================
    NICEPLAY · 房間伺服器
    ------------------------------------------------------------
-   讓多臺裝置看同一場比賽。開一場比賽會拿到六碼房號，
-   其他裝置輸入房號就加入 —— 不用註冊、不用帳號，房號即權限。
+   讓多臺裝置看同一場比賽。開房會拿到兩組六碼：
+
+     主控房號  店員用。可以回報勝負。
+     觀眾碼    選手用。只能看，伺服器會擋掉所有寫入。
+
+   兩組都不用註冊、不用帳號 —— 碼即權限，像會議室連結。
+   唯讀是在伺服器擋的，不是只把按鈕藏起來。
 
    設計沿用 2026-08-15 臺東卡牌大賽現場驗證過的那一套：
 
@@ -58,29 +63,34 @@ async function makeStore() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rooms (
       code       TEXT PRIMARY KEY,
+      view_code  TEXT UNIQUE,
       host_token TEXT NOT NULL,
       state      JSONB NOT NULL,
       rev        INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )`);
+  await pool.query('ALTER TABLE rooms ADD COLUMN IF NOT EXISTS view_code TEXT');
   await pool.query('CREATE INDEX IF NOT EXISTS rooms_updated ON rooms (updated_at)');
+  await pool.query('CREATE INDEX IF NOT EXISTS rooms_view ON rooms (view_code)');
   console.log('  已連上 Postgres');
 
   return {
     kind: 'postgres',
-    async create(code, hostTok, state) {
+    async create(code, viewCode, hostTok, state) {
       await pool.query(
-        'INSERT INTO rooms (code, host_token, state, rev) VALUES ($1,$2,$3,1)',
-        [code, hostTok, state]);
-      return { code, rev: 1 };
+        'INSERT INTO rooms (code, view_code, host_token, state, rev) VALUES ($1,$2,$3,$4,1)',
+        [code, viewCode, hostTok, state]);
+      return { code, viewCode, rev: 1 };
     },
     async get(code) {
       const r = await pool.query(
-        'SELECT code, host_token, state, rev FROM rooms WHERE code = $1', [code]);
+        'SELECT code, view_code, host_token, state, rev FROM rooms WHERE code = $1 OR view_code = $1',
+        [code]);
       if (!r.rows.length) return null;
       const x = r.rows[0];
-      return { code: x.code, hostToken: x.host_token, state: x.state, rev: x.rev };
+      return { code: x.code, viewCode: x.view_code, hostToken: x.host_token,
+               state: x.state, rev: x.rev, readOnly: x.view_code === code };
     },
     async put(code, state, rev) {
       await pool.query(
@@ -103,11 +113,18 @@ function memoryStore() {
   const m = new Map();
   return {
     kind: 'memory',
-    async create(code, hostTok, state) {
-      m.set(code, { code, hostToken: hostTok, state, rev: 1, updatedAt: Date.now() });
-      return { code, rev: 1 };
+    async create(code, viewCode, hostTok, state) {
+      m.set(code, { code, viewCode, hostToken: hostTok, state, rev: 1, updatedAt: Date.now() });
+      return { code, viewCode, rev: 1 };
     },
-    async get(code) { return m.get(code) || null; },
+    async get(code) {
+      const direct = m.get(code);
+      if (direct) return Object.assign({}, direct, { readOnly: false });
+      for (const v of m.values()) {
+        if (v.viewCode === code) return Object.assign({}, v, { readOnly: true });
+      }
+      return null;
+    },
     async put(code, state, rev) {
       const r = m.get(code);
       if (r) { r.state = state; r.rev = rev; r.updatedAt = Date.now(); }
@@ -217,9 +234,13 @@ const server = http.createServer(async (req, res) => {
       }
       let code = roomCode(), tries = 0;
       while (await store.get(code)) { code = roomCode(); if (++tries > 8) break; }
+      let viewCode = roomCode(), t2 = 0;
+      while (viewCode === code || await store.get(viewCode)) {
+        viewCode = roomCode(); if (++t2 > 8) break;
+      }
       const hostTok = token();
-      await store.create(code, hostTok, body.state);
-      return json(res, 200, { code, hostToken: hostTok, rev: 1 });
+      await store.create(code, viewCode, hostTok, body.state);
+      return json(res, 200, { code, viewCode, hostToken: hostTok, rev: 1 });
     }
 
     const m = path.match(/^\/api\/rooms\/([A-Za-z0-9]{4,12})(\/(state|action|stream))?$/);
@@ -231,7 +252,9 @@ const server = http.createServer(async (req, res) => {
 
       /* 取狀態（輪詢用） */
       if (!sub && req.method === 'GET') {
-        return json(res, 200, { code, rev: room.rev, state: room.state });
+        return json(res, 200, {
+          code: code, rev: room.rev, state: room.state, readOnly: !!room.readOnly
+        });
       }
 
       /* 即時推送 */
@@ -244,8 +267,10 @@ const server = http.createServer(async (req, res) => {
           'X-Accel-Buffering': 'no'
         });
         res.write('retry: 3000\n\n');
-        res.write('data: ' + JSON.stringify({ rev: room.rev, state: room.state }) + '\n\n');
-        const off = subscribe(code, res);
+        res.write('data: ' + JSON.stringify({
+          rev: room.rev, state: room.state, readOnly: !!room.readOnly
+        }) + '\n\n');
+        const off = subscribe(room.code, res);
         /* 心跳：中間有代理時避免連線被當成閒置砍掉 */
         const beat = setInterval(() => { try { res.write(': ping\n\n'); } catch (e) {} }, 25000);
         req.on('close', () => { clearInterval(beat); off(); });
@@ -254,6 +279,7 @@ const server = http.createServer(async (req, res) => {
 
       /* 主控端寫入整份狀態 */
       if (sub === 'state' && req.method === 'POST') {
+        if (room.readOnly) return json(res, 403, { error: '這是選手查詢碼，只能看不能改' });
         const body = await readBody(req, MAX_STATE_BYTES);
         if (body.hostToken !== room.hostToken) {
           return json(res, 403, { error: '只有開房的那臺可以覆寫整份狀態' });
@@ -262,13 +288,14 @@ const server = http.createServer(async (req, res) => {
           return json(res, 400, { error: '缺少 state' });
         }
         const rev = room.rev + 1;
-        await store.put(code, body.state, rev);
-        publish(code, { rev, state: body.state });
+        await store.put(room.code, body.state, rev);
+        publish(room.code, { rev, state: body.state });
         return json(res, 200, { rev });
       }
 
       /* 任何加入者回報勝負 */
       if (sub === 'action' && req.method === 'POST') {
+        if (room.readOnly) return json(res, 403, { error: '這是選手查詢碼，只能看不能改' });
         const body = await readBody(req, 64 * 1024);
         if (body.op !== 'result') return json(res, 400, { error: '不支援的操作' });
         const state = room.state;
@@ -276,8 +303,8 @@ const server = http.createServer(async (req, res) => {
           return json(res, 409, { error: '找不到那一桌', rev: room.rev, state });
         }
         const rev = room.rev + 1;
-        await store.put(code, state, rev);
-        publish(code, { rev, state });
+        await store.put(room.code, state, rev);
+        publish(room.code, { rev, state });
         return json(res, 200, { rev, state });
       }
     }

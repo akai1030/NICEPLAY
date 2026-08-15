@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#555}iframe{border:0;display:block}
+</style></head><body>
+<iframe id="f"></iframe>
+<script>
+var q = new URLSearchParams(location.search);
+var theme = q.get('theme') || 'dark';
+var view  = q.get('view')  || 'setup';
+var W = +(q.get('w') || 980), H = +(q.get('h') || 1400);
+var names = ['王小明','陳小美','林阿明','李大華','張小強','黃小美','吳大同','鄭雅琪'];
+var players = names.map(function(n,i){return {id:'p'+(i+1),no:i+1,name:n,dropped:false};});
+var matches = [
+ {round:1,table:'1',a:'p1',b:'p2',result:'a'},
+ {round:1,table:'2',a:'p3',b:'p4',result:'b'},
+ {round:1,table:'3',a:'p5',b:'p6',result:null},
+ {round:1,table:'4',a:'p7',b:'p8',result:null}
+];
+localStorage.setItem('niceplay.state.v1', JSON.stringify({
+  v:1, rev:3, theme:theme, phase: view==='setup' ? 'setup' : 'running',
+  event:{name:'週三夜間賽',date:'2026-08-16'},
+  config:{format:'swiss',rounds:3,cut:0,minutes:25,tableNaming:'number',
+          tableCount:4,customTables:[],rules:{win:3,draw:1,loss:0,minWinPct:0.25},liveTable:'1'},
+  players:players, matches: view==='setup' ? [] : matches,
+  timer:{running:false,endsAt:0,left:1500}
+}));
+localStorage.removeItem('niceplay.net.v1');
+var f = document.getElementById('f');
+f.style.width = W+'px'; f.style.height = H+'px';
+f.src = '../index.html' + (view==='present' ? '#present' : '');
+f.onload = function(){
+  var d = f.contentDocument, w = f.contentWindow;
+  setTimeout(function(){
+    if (view==='book') d.getElementById('btnBook').click();
+    if (view==='play' || view==='present') {
+      var t = d.querySelector('.tabs button[data-tab="tPlay"]');
+      if (t && !t.disabled) t.click();
+    }
+    document.title = 'READY';
+  }, 500);
+};
+</script></body></html>

@@ -20,8 +20,13 @@ var drafting = null;           /* 名單暫存，還沒按「開始比賽」 */
 var applyingRemote = false;    /* 正在套用伺服器來的狀態，這時候不要再推回去 */
 
 var SRV_KEY = 'niceplay.server';
+var ME_KEY = 'niceplay.me';
+
+/* 官方房間伺服器。自己架的話改這一行，或在設定頁直接改欄位（會記在瀏覽器裡）。 */
+var DEFAULT_SERVER = 'https://niceplayroom.transtation.org';
+
 var net = window.Net.create({
-  server: localStorage.getItem(SRV_KEY) || '',
+  server: localStorage.getItem(SRV_KEY) || DEFAULT_SERVER,
   onState: function (remote, role) {
     /* 伺服器來的整份狀態直接取代本機。主控與加入者都吃這條，
        所以「傳整份快照」的自癒特性在兩邊都成立。 */
@@ -299,6 +304,7 @@ el('matchList').addEventListener('click', function (e) {
   var table = d.dataset.t, want = d.dataset.r;
   var st = store.get(), r = currentRound(st);
 
+  if (net.role === 'watch') { toast('查詢模式只能看，回報請找店員', true); return; }
   if (net.role === 'guest') {
     /* 加入者不改本機，送給伺服器；伺服器套用完會把新狀態推回來 */
     net.sendResult(r, table, want).catch(function () {});
@@ -373,6 +379,21 @@ el('btnPrint').onclick = function () {
     el('tRank').classList.remove('print-me'); }, 500); }, 60);
 };
 
+/* ── 使用手冊 ─────────────────────────────────────────
+   左下角那顆按鈕，任何一頁都按得到。第一次打開這個網站的店家
+   會找它，現場忘記下一步的人也會找它。                */
+function openBook(on) {
+  el('book').classList.toggle('on', on);
+  el('book').scrollTop = 0;
+  el('bookBody').scrollTop = 0;
+}
+el('btnBook').onclick = function () { openBook(true); };
+el('btnBookClose').onclick = function () { openBook(false); };
+el('btnBookPrint').onclick = function () { window.print(); };
+addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && el('book').classList.contains('on')) openBook(false);
+});
+
 /* ── 連線 ─────────────────────────────────────────────
    開房＝這臺當主控，配對與下一輪都在這裡算；
    加入＝只能回報勝負。房號即權限，不需要帳號。      */
@@ -381,19 +402,93 @@ function paintNet(st) {
   var role = st.role;
   pill.hidden = (role === 'off');
   pill.className = 'netpill ' + (st.bad ? 'bad' : role);
-  pill.textContent = role === 'off' ? ''
-    : (role === 'host' ? '主控 ' : '加入 ') + st.code + (st.online ? '' : ' · 斷線');
+  pill.textContent = role === 'off' ? '' : ({
+    host: '主控 ', guest: '加入 ', watch: '查詢 '
+  }[role] || '') + st.code + (st.online ? '' : ' · 斷線');
 
   el('netOff').hidden = (role !== 'off');
   el('netOn').hidden = (role === 'off');
-  el('roomCode').textContent = st.code || '——';
-  el('roomHint').innerHTML = role === 'host'
-    ? '把這六碼唸給店員，他在自己手機打開同一個網址、輸入房號就進來了。<br>' +
-      '<b>這臺是主控</b>：配對、下一輪、改設定都在這裡做。'
-    : '<b>你是加入者</b>：可以回報勝負，配對與下一輪由主控那臺決定。';
+  el('roomCode').textContent = role === 'host' ? net.code : st.code;
+  el('viewBox').hidden = (role !== 'host');
+  el('viewCode').textContent = net.viewCode || '——';
+
+  el('roomHint').innerHTML =
+    role === 'host'
+      ? '<b>店員房號</b>唸給要幫忙回報的人；<b>選手查詢碼</b>可以公開貼出來，' +
+        '拿到的人只能看，改不了任何東西。'
+      : role === 'watch'
+        ? '<b>查詢模式</b>：可以看對戰表與名次，不能修改。'
+        : '<b>你是加入者</b>：可以回報勝負，配對與下一輪由主控那臺決定。';
+
   document.body.classList.toggle('guest', role === 'guest');
+  document.body.classList.toggle('watch', role === 'watch');
   if (st.msg) toast(st.msg, st.bad);
 }
+
+/* ── 選手查詢模式：我是誰、我在第幾桌 ─────────────── */
+var meId = localStorage.getItem(ME_KEY) || '';
+
+function paintMe(st) {
+  var panel = el('mePanel');
+  if (net.role !== 'watch') { panel.hidden = true; return; }
+  panel.hidden = false;
+
+  var me = null;
+  st.players.forEach(function (p) { if (p.id === meId) me = p; });
+
+  if (!me) {
+    el('meBar').hidden = true;
+    el('mePick').hidden = false;
+    el('meList').innerHTML = st.players.map(function (p) {
+      return '<div class="nm" data-id="' + p.id + '"><i>' + p.no + '</i>' +
+             '<span>' + esc(p.name) + '</span></div>';
+    }).join('');
+    return;
+  }
+
+  el('mePick').hidden = true;
+  el('meBar').hidden = false;
+
+  var r = currentRound(st);
+  var mine = null;
+  matchesOf(st, r).forEach(function (m) {
+    if (m.a === meId || m.b === meId) mine = m;
+  });
+  var rows = E.standings(st.players, st.matches, st.config.rules);
+  var row = null;
+  rows.forEach(function (x) { if (x.id === meId) row = x; });
+
+  var at = mine
+    ? (mine.b === null || mine.b === undefined
+        ? '<span>本輪</span><b>輪空</b>'
+        : '<span>你在第</span><b>' + esc(mine.table) + '</b><span>桌</span>')
+    : '<span>本輪</span><b>—</b>';
+
+  var opp = '';
+  if (mine && mine.b !== null && mine.b !== undefined) {
+    opp = '對手　' + esc(nameOf(st, mine.a === meId ? mine.b : mine.a));
+  }
+
+  el('meBar').innerHTML =
+    '<span class="who">' + esc(me.name) + '</span>' +
+    '<span class="rec">' + (row ? '第 ' + row.rank + ' 名　' + row.w + '-' + row.l +
+      (row.d ? '-' + row.d : '') + '　' + row.pts + ' 分' : '') + '</span>' +
+    '<span class="rec">' + opp + '</span>' +
+    '<button class="sm" id="btnNotMe">不是我</button>' +
+    '<span class="at">' + at + '</span>';
+
+  var b = el('btnNotMe');
+  if (b) b.onclick = function () {
+    meId = ''; localStorage.removeItem(ME_KEY); render(store.get());
+  };
+}
+
+el('meList').addEventListener('click', function (e) {
+  var d = e.target.closest('.nm'); if (!d) return;
+  meId = d.dataset.id;
+  localStorage.setItem(ME_KEY, meId);
+  render(store.get());
+});
 
 el('fServer').oninput = function () {
   var v = el('fServer').value.trim();
@@ -425,7 +520,7 @@ function applyTheme(st) {
   el('btnTheme').textContent = t === 'light' ? '☀' : '◐';
   el('btnTheme').title = t === 'light' ? '目前淺色，點一下換深色' : '目前深色，點一下換淺色';
   var meta = document.querySelector('meta[name=theme-color]');
-  if (meta) meta.setAttribute('content', t === 'light' ? '#F4F5F7' : '#000000');
+  if (meta) meta.setAttribute('content', t === 'light' ? '#F5F6FA' : '#0B0D12');
 }
 el('btnTheme').onclick = function () {
   store.commit(function (s) { s.theme = (s.theme === 'light') ? 'dark' : 'light'; });
@@ -470,14 +565,48 @@ el('btnFull').onclick = function () {
   }
 };
 
+/* 關掉投影窗有兩個坑，兩個都會讓現場很難看：
+
+   一、全螢幕的時候直接 window.close()。macOS 上全螢幕視窗自己佔一個桌面，
+       視窗被腳本關掉時整個桌面會塌掉，畫面黑一下、選單列亂跳 ——
+       所以一定要先退出全螢幕、等動畫跑完，再關。
+   二、close() 不見得成功。只有腳本開出來的視窗關得掉；如果這個分頁是
+       重新整理過、被工作階段還原、或使用者自己複製出來的，close() 會被
+       瀏覽器無聲擋掉。擋掉就退回控制台畫面，不要讓人卡在一個關不掉的投影頁。 */
+function closePresent() {
+  var done = function () {
+    if (!isPopup) { enterPresent(false); return; }
+    try { window.close(); } catch (e) {}
+    /* 沒關掉就是被擋了 —— 至少讓它變回可以操作的控制台 */
+    setTimeout(function () {
+      if (!window.closed) {
+        isPopup = false;
+        enterPresent(false);
+        el('btnClosePv').textContent = '回到控制台';
+        toast('這個視窗不是投影窗開出來的，瀏覽器不讓程式關它 —— 已經切回控制台', true);
+      }
+    }, 400);
+  };
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().then(done, done);
+    setTimeout(done, 700);          /* 有些瀏覽器不回 promise，補一個保險 */
+    return;
+  }
+  done();
+}
+
+/* 比賽進行中誤按會直接讓全場失去畫面，所以要按兩次 */
 el('btnClosePv').onclick = function () {
-  if (isPopup) window.close();
-  else enterPresent(false);
+  if (!confirmOnce('closepv', '再按一次關閉投影 —— 全場就看不到畫面了')) return;
+  closePresent();
 };
 
 addEventListener('keydown', function (e) {
   if (!document.body.classList.contains('present')) return;
-  if (e.key === 'Escape') { el('btnClosePv').onclick(); return; }
+  /* Esc 只做一件事：離開全螢幕。
+     絕對不能順手把投影窗關掉 —— macOS 上退出全螢幕本來就是按 Esc，
+     兩件事綁在一起等於「想縮小畫面結果整個投影不見了」。 */
+  if (e.key === 'Escape') return;
   if (e.key === '1') { pvMode = 'matches'; render(store.get()); }
   if (e.key === '2') { pvMode = 'rank'; render(store.get()); }
   if (e.key === 'f' || e.key === 'F') el('btnFull').onclick();
@@ -514,6 +643,7 @@ function render(st) {
 
   applyTheme(st);
   paintMatches(st);
+  paintMe(st);
   paintRank(st);
   if (document.body.classList.contains('present')) paintPresent(st);
 }
@@ -538,7 +668,9 @@ function paintMatches(st) {
 
   el('matchList').innerHTML = ms.map(function (m) {
     var live = st.config.liveTable && m.table === st.config.liveTable;
-    var h = '<div class="mt' + (m.result ? ' done' : '') + (live ? ' islive' : '') + '">' +
+    var mine = net.role === 'watch' && meId && (m.a === meId || m.b === meId);
+    var h = '<div class="mt' + (m.result ? ' done' : '') + (live ? ' islive' : '') +
+            (mine ? ' mine' : '') + '">' +
             '<div class="tb">' + esc(m.table) + '</div>';
     h += side(st, m, 'a');
     if (m.b === null || m.b === undefined) {
@@ -714,7 +846,7 @@ store.subscribe(function (st) {
   if (!applyingRemote && net.role === 'host') net.pushState(st);
 });
 
-el('fServer').value = localStorage.getItem(SRV_KEY) || '';
+el('fServer').value = localStorage.getItem(SRV_KEY) || DEFAULT_SERVER;
 net.resume();
 ['fFormat', 'fNaming'].forEach(function (id) { el(id).onchange = syncFormatFields; });
 ['fTables', 'fCustom'].forEach(function (id) { el(id).oninput = function () { updateTableHint(); }; });

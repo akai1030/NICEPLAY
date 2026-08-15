@@ -1,0 +1,91 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body>
+<iframe id="h" style="width:700px;height:800px;border:0"></iframe>
+<iframe id="w" style="width:420px;height:800px;border:0"></iframe>
+<pre id="out">RUNNING</pre>
+<script>
+(function(){
+ var L=[],fails=0;
+ function say(s){L.push(s);document.getElementById('out').textContent=L.join('\n');}
+ function ok(c,m){if(!c){fails++;say('  ✗ '+m);}}
+ var sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ var SRV=new URLSearchParams(location.search).get('srv');
+ var H=document.getElementById('h'),V=document.getElementById('w');
+ function D(f){return f.contentDocument;} function W(f){return f.contentWindow;}
+ function el(f,i){return D(f).getElementById(i);}
+ function click(f,n){if(!n){fails++;say('  ✗ 元素不存在');return;}
+   var e=D(f).createEvent('MouseEvents');e.initEvent('click',true,true);n.dispatchEvent(e);}
+ function setVal(f,id,v){var n=el(f,id);n.value=v;
+   ['input','change'].forEach(t=>{var e=D(f).createEvent('HTMLEvents');e.initEvent(t,true,true);n.dispatchEvent(e);});}
+ function kill(f){try{W(f).BroadcastChannel=undefined;W(f).EventSource=undefined;}catch(e){}}
+ function load(f,u){return new Promise(r=>{f.onload=()=>r();f.src=u;});}
+ (async()=>{
+  await load(H,'../index.html'); W(H).localStorage.clear();
+  await load(H,'../index.html'); kill(H); await sleep(400);
+
+  say('【1】預設伺服器位址');
+  ok(el(H,'fServer').value.indexOf('http')===0,'伺服器欄位沒有預設值：'+el(H,'fServer').value);
+  say('  已預填 '+el(H,'fServer').value+' ✓');
+
+  say('【2】未連線時不該出現「你是加入者」');
+  ok(el(H,'netOn').offsetParent===null,'netOn 沒有被藏起來（hidden 被 CSS 蓋掉）');
+  say('  netOn 正確隱藏 ✓');
+
+  setVal(H,'fServer',SRV);
+  setVal(H,'fPlayers','王小明\n陳小美\n林阿明\n李大華');
+  click(H,el(H,'btnParse')); await sleep(200);
+  setVal(H,'fMinutes','0'); click(H,el(H,'btnStart')); await sleep(400);
+
+  say('【3】開房拿到兩組碼');
+  click(H,el(H,'btnHost')); await sleep(1200);
+  var code=el(H,'roomCode').textContent.trim(), view=el(H,'viewCode').textContent.trim();
+  ok(/^[A-Z0-9]{6}$/.test(code),'店員房號不對：'+code);
+  ok(/^[A-Z0-9]{6}$/.test(view),'選手查詢碼不對：'+view);
+  ok(code!==view,'兩組碼一樣');
+  say('  店員 '+code+' · 選手 '+view+' ✓');
+
+  say('【4】選手用查詢碼進來');
+  await load(V,'../index.html'); kill(V); W(V).localStorage.clear();
+  await load(V,'../index.html'); kill(V); await sleep(400);
+  setVal(V,'fServer',SRV); setVal(V,'fJoin',view);
+  click(V,el(V,'btnJoin')); await sleep(1500);
+  ok(D(V).body.classList.contains('watch'),'沒有進入查詢模式');
+  ok(!D(V).body.classList.contains('guest'),'誤判成可回報的加入者');
+  var st=()=>JSON.parse(W(V).localStorage.getItem('niceplay.state.v1'));
+  ok(st().players.length===4,'沒拿到名單');
+  say('  進入查詢模式、拿到 4 人名單 ✓');
+
+  say('【5】查詢模式什麼都不能改');
+  ['btnNext','btnRepair','btnTimer'].forEach(id=>{
+    ok(W(V).getComputedStyle(el(V,id)).display==='none',id+' 應該藏起來');});
+  ok(W(V).getComputedStyle(D(V).querySelector('.tabs button[data-tab="tSetup"]')).display==='none',
+     '設定分頁應該藏起來');
+  var before=JSON.stringify(st().matches);
+  click(V,D(V).querySelectorAll('#matchList .mt')[0].querySelectorAll('.sd')[0]);
+  await sleep(1200);
+  ok(JSON.stringify(st().matches)===before,'查詢模式竟然改得動勝負');
+  say('  按鈕全藏、點下去也改不了 ✓');
+
+  say('【6】伺服器端真的擋（不是只藏按鈕）');
+  var r=await fetch(SRV+'/api/rooms/'+view+'/action',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({op:'result',round:1,table:'1',value:'a'})});
+  ok(r.status===403,'直接打 API 竟然沒被擋，HTTP '+r.status);
+  say('  繞過前端直接打 API → HTTP 403 ✓');
+
+  say('【7】選手挑自己的名字');
+  ok(!el(V,'mePanel').hidden,'沒有出現「你是哪一位」');
+  var chips=D(V).querySelectorAll('#meList .nm');
+  ok(chips.length===4,'名字選單應該 4 個，實際 '+chips.length);
+  click(V,chips[0]); await sleep(400);
+  var bar=el(V,'meBar');
+  ok(!bar.hidden,'選完之後沒有顯示你在第幾桌');
+  ok(bar.textContent.indexOf('王小明')>=0,'沒顯示名字');
+  ok(/第|輪空/.test(bar.textContent),'沒顯示桌號');
+  ok(D(V).querySelectorAll('#matchList .mt.mine').length===1,'沒有高亮自己那一桌');
+  say('  '+bar.textContent.replace(/\s+/g,' ').trim().slice(0,54)+' ✓');
+
+  say('');
+  say(fails===0?'選手查詢模式全部通過 ✅':'有 '+fails+' 項失敗 ❌'); say('DONE');
+ })().catch(e=>{say('EX '+e.message+'\n'+e.stack);say('DONE');});
+})();
+</script></body></html>

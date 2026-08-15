@@ -1,42 +1,51 @@
 /* ============================================================
    NICEPLAY · 視覺系統
    ------------------------------------------------------------
-   沿用《臺東卡牌大賽 · 寶可夢道館賽》現場實戰的主視覺：
-     · 純黑底 + 純白大字（投影在暗場最清楚）
-     · 電光藍 = 主要動作 · 萊姆綠 = 進行中／勝
-     · 紅 = 對手側／警示 · 橄欖金 = 眉標與次要資訊
+   依 NICEPLAY 品牌規範：
+     · 碳黑底（#0B0D12）+ 純白大字，投影在暗場最清楚
+     · 電光藍 #2563FF   主要動作、我方
+     · 霓虹紫 #A855F7   進行中、串接
+     · 桃紅   #FF2ED1   勝 · 晉級 · 決勝時刻
+     · 主品牌漸層 藍 → 紫 → 桃紅，只用在最重要的那一個東西上
+     · 狀態色：LIVE #FF3B30 · WARNING #FF8800 · FINISHED #6B7280
      · 桌號用襯線體、數字用等寬體、中文用黑體
-   色值取樣自實際主視覺，非目測。
+
+   兩個主題的差別只在「介面色」，品牌色完全不動 ——
+   桃紅還是那個桃紅，只是當文字用的版本在白底要壓深才讀得到。
 
    現場不接外網，一律走系統字型，不載任何 webfont。
    ============================================================ */
 
 :root {
   /* 品牌色：兩個主題共用，這些是「身分」不是「背景」 */
-  --blue:       #1824E4;
-  --blue-soft:  #7C86FF;
-  --lime:       #B0D000;   /* 進行中 · 勝 · 晉級（當底色用）*/
-  --red:        #D8285F;
-  --gold:       #A89330;
-  --black:      #000000;   /* 壓在萊姆綠／金色上的字，永遠是深的 */
-  --white:      #FAFAFA;   /* 壓在藍色／紅色上的字，永遠是淺的 */
+  --blue:        #2563FF;
+  --blue-soft:   #8AA4FF;
+  --purple:      #A855F7;
+  --purple-soft: #C99BFF;
+  --lime:        #FF2ED1;   /* 勝 · 晉級 · 進行中（當底色用）*/
+  --red:         #FF3B30;   /* LIVE · 對手側 · 警示 */
+  --gold:        #FF8800;   /* WARNING */
+  --black:       #0B0D12;   /* 壓在桃紅／橘上的字，永遠是深的 */
+  --white:       #FFFFFF;   /* 壓在藍色／紅色上的字，永遠是淺的 */
+  --grad:        linear-gradient(96deg, #2563FF 0%, #A855F7 52%, #FF2ED1 100%);
 
-  /* 介面色：深色主題（預設）。投影在暗場最清楚。 */
-  --bg:         #000000;
-  --surface:    #0B0B0D;
-  --surface-2:  #14141A;
-  --fg:         #FAFAFA;
-  --line:       rgba(250,250,250,.14);
-  --line-hard:  rgba(250,250,250,.30);
-  --dim:        rgba(250,250,250,.60);
-  --faint:      rgba(250,250,250,.34);
-  --accent-fg:  #B0D000;   /* 萊姆綠當「文字」用的版本 */
-  --label-fg:   #A89330;
-  --label-line: #4A4218;
-  --danger-fg:  #FFB4C6;
-  --pink:       #FFB4C6;
-  --ink:        #0B0B0D;
-  --gold-dim:   #4A4218;
+  /* 介面色：深色主題（預設） */
+  --bg:         #0B0D12;
+  --surface:    #13161D;
+  --surface-2:  #1B1F29;
+  --fg:         #FFFFFF;
+  --line:       rgba(255,255,255,.13);
+  --line-hard:  rgba(255,255,255,.28);
+  --dim:        rgba(255,255,255,.62);
+  --faint:      rgba(255,255,255,.36);
+  --accent-fg:  #FF8AE0;   /* 桃紅當「文字」用的版本 */
+  --label-fg:   #9AA2C4;
+  --label-line: #2C3242;
+  --danger-fg:  #FF9A93;
+  --pink:       #FF8AE0;
+  --ink:        #13161D;
+  --gold-dim:   #4A3418;
+  --glow:       rgba(255,46,209,.24);
 
   --f-cn:    "PingFang TC","Noto Sans TC","Microsoft JhengHei","Heiti TC",sans-serif;
   --f-serif: "Songti TC","Times New Roman","PMingLiU",serif;
@@ -46,28 +55,32 @@
   --tap: 48px;
 }
 
-/* 淺色主題：明亮場地、日光教室、或單純看習慣。
-   只換介面色，品牌色不動 —— 綠還是那個綠，
-   只是「當文字用」的版本要壓深，白底上才讀得到。 */
+/* 淺色主題：明亮場地、日光教室、或單純看習慣。 */
 :root[data-theme="light"] {
-  --bg:         #F4F5F7;
+  --bg:         #F5F6FA;
   --surface:    #FFFFFF;
-  --surface-2:  #ECEDF1;
-  --fg:         #0B0B0D;
-  --line:       rgba(11,11,13,.13);
-  --line-hard:  rgba(11,11,13,.28);
-  --dim:        rgba(11,11,13,.62);
-  --faint:      rgba(11,11,13,.40);
-  --accent-fg:  #5E7000;
-  --label-fg:   #6E5F16;
-  --label-line: #D8D2AE;
-  --danger-fg:  #B01745;
-  --pink:       #B01745;
+  --surface-2:  #EAECF3;
+  --fg:         #0B0D12;
+  --line:       rgba(11,13,18,.12);
+  --line-hard:  rgba(11,13,18,.26);
+  --dim:        rgba(11,13,18,.62);
+  --faint:      rgba(11,13,18,.42);
+  --accent-fg:  #B0117F;
+  --label-fg:   #5C6480;
+  --label-line: #CFD4E4;
+  --danger-fg:  #C41B12;
+  --pink:       #B0117F;
   --ink:        #FFFFFF;
-  --gold-dim:   #D8D2AE;
+  --gold-dim:   #E4D2B4;
+  --glow:       rgba(255,46,209,.20);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+/* hidden 屬性一定要贏。任何作者端的 display 規則都會蓋掉瀏覽器預設的
+   [hidden]{display:none}，例如 .row{display:flex} —— 少了這行，
+   標了 hidden 的區塊還是會顯示出來。 */
+[hidden] { display: none !important; }
 
 html, body {
   height: 100%;
@@ -87,23 +100,33 @@ body { display: flex; flex-direction: column; }
   border-bottom: 2px solid var(--line-hard);
   padding: 10px 14px; display: flex; align-items: center; gap: 12px;
 }
-/* 品牌鎖定：中文為主、英文為輔。
-   英文短名放在上面當眉標，中文全名是實際辨識的那一行。 */
-.brand { display: flex; flex-direction: column; gap: 1px; white-space: nowrap; }
-.brand .en { font-family: var(--f-mono); font-size: 9.5px; font-weight: 700;
-             letter-spacing: .34em; color: var(--accent-fg); }
-.brand .cn { font-size: 15px; font-weight: 700; letter-spacing: .04em; color: var(--fg); }
-@media (max-width: 720px) { .brand .cn { font-size: 13px; letter-spacing: 0; } }
-@media (max-width: 520px) { .brand .cn { display: none; } }
+/* 品牌鎖定：標誌 + NICEPLAY 字標，中文全名放在下面那行。
+   兩個主題各有一版素材（白色版／碳黑版），用主題切換，不改圖。 */
+.brand { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+.brand .mk { flex: 0 0 auto; width: 34px; height: 34px;
+             background: url(../assets/mark.png) center/contain no-repeat; }
+.brand .tx { display: flex; flex-direction: column; gap: 2px; }
+.brand .wm { width: 104px; height: 22px;
+             background: url(../assets/wordmark.png) left center/contain no-repeat; }
+.brand .cn { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--dim); }
+:root[data-theme="light"] .brand .mk { background-image: url(../assets/mark-light.png); }
+:root[data-theme="light"] .brand .wm { background-image: url(../assets/wordmark-light.png); }
+@media (max-width: 720px) { .brand .cn { display: none; } }
+@media (max-width: 520px) { .brand .wm { display: none; } }
 
 /* 設定頁最上面的識別區：第一次打開的人先看到這個 */
-.hero { padding: 6px 0 22px; margin-bottom: 22px; border-bottom: 2px solid var(--fg); }
-.hero h1 { font-size: clamp(24px, 4.6vw, 34px); font-weight: 900;
-           letter-spacing: .02em; line-height: 1.2; }
-.hero .mark { font-family: var(--f-mono); font-size: 12px; font-weight: 700;
-              letter-spacing: .36em; color: var(--accent-fg); margin-top: 10px; }
-.hero .full { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .04em;
-              color: var(--faint); margin-top: 4px; line-height: 1.5; }
+.hero { padding: 4px 0 22px; margin-bottom: 22px;
+        border-bottom: 2px solid var(--line-hard); }
+.hero .lock { display: block; width: min(420px, 78%); aspect-ratio: 1317 / 593;
+              background: url(../assets/lockup.png) left center/contain no-repeat; }
+:root[data-theme="light"] .hero .lock { background-image: url(../assets/lockup-light.png); }
+.hero .motto { margin-top: 16px; font-size: clamp(17px, 2.6vw, 22px);
+               font-weight: 900; letter-spacing: .01em; line-height: 1.35; }
+.hero .motto b { font-weight: 900;
+  background: var(--grad); -webkit-background-clip: text; background-clip: text;
+  color: transparent; }
+.hero .motto span { display: block; font-family: var(--f-mono); font-size: 11px;
+  letter-spacing: .34em; color: var(--label-fg); margin-top: 8px; font-weight: 400; }
 .evt { flex: 1; min-width: 0; font-size: 14px; color: var(--dim);
        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .clock { font-family: var(--f-mono); font-size: 15px; color: var(--dim); }
@@ -116,12 +139,15 @@ body { display: flex; flex-direction: column; }
   min-height: 52px; font-size: 15px; font-weight: 700; font-family: inherit;
   cursor: pointer; letter-spacing: .04em;
 }
-.tabs button.on { background: var(--surface); color: var(--accent-fg);
-                  box-shadow: inset 0 -3px 0 var(--lime); }
+.tabs button { position: relative; }
+.tabs button.on { background: var(--surface); color: var(--accent-fg); }
+.tabs button.on::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 3px; background: var(--grad); }
 .tabs button:disabled { opacity: .3; cursor: default; }
 
 /* ── 內容區 ─────────────────────────────────────────── */
-.pane { flex: 1 1 auto; overflow-y: auto; padding: 16px; display: none;
+/* 下面留一段空間給左下角那顆「使用手冊」，捲到底時才不會壓到內容 */
+.pane { flex: 1 1 auto; overflow-y: auto; padding: 16px 16px 78px; display: none;
         -webkit-overflow-scrolling: touch; }
 .pane.on { display: block; }
 .wrap { max-width: 820px; margin: 0 auto; }
@@ -171,7 +197,9 @@ button {
 }
 button:active { transform: scale(.97); }
 button:disabled { opacity: .35; cursor: default; }
-button.go   { background: var(--lime); border-color: var(--lime); color: var(--black); font-weight: 900; }
+/* 主要動作走品牌漸層 —— 整個介面只有這一種按鈕是漸層的，
+   所以「最該按的那一顆」永遠一眼就看得到。 */
+button.go   { background: var(--grad); border-color: transparent; color: #FFF; font-weight: 900; }
 button.main { background: var(--blue); border-color: var(--blue); color: var(--white); font-weight: 900; }
 button.warn { background: var(--gold); border-color: var(--gold); color: var(--black); font-weight: 900; }
 button.danger { border-color: var(--red); color: var(--danger-fg); }
@@ -206,7 +234,7 @@ button.big { min-height: 60px; font-size: 18px; }
   border: 2px solid var(--line-hard); border-radius: 50%;
 }
 .mt.done .tb { border-color: var(--lime); color: var(--accent-fg); }
-.mt.islive .tb { box-shadow: 0 0 0 3px rgba(176,208,0,.25); }
+.mt.islive .tb { box-shadow: 0 0 0 3px var(--glow); }
 .mt .sd {
   flex: 1 1 0; min-width: 0; background: var(--surface);
   border: 2px solid var(--line-hard); border-radius: var(--r);
@@ -236,7 +264,7 @@ button.big { min-height: 60px; font-size: 18px; }
         font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; color: var(--dim); }
 .prog b { color: var(--accent-fg); font-size: 22px; font-weight: 700; }
 .prog .bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
-.prog .bar i { display: block; height: 100%; background: var(--lime); transition: width .3s; }
+.prog .bar i { display: block; height: 100%; background: var(--grad); transition: width .3s; }
 
 /* ── 排名表 ─────────────────────────────────────────── */
 table.rank { width: 100%; border-collapse: collapse; font-size: 15px; }
@@ -251,7 +279,7 @@ table.rank td { padding: 9px 6px; border-bottom: 1px solid var(--line); text-ali
 table.rank td.l { text-align: left; width: 99%; }
 table.rank td.rk { font-weight: 900; text-align: center; width: 34px; }
 table.rank td.pt { color: var(--accent-fg); font-weight: 900; font-size: 17px; }
-table.rank tr.cut td { background: rgba(176,208,0,.09); }
+table.rank tr.cut td { background: rgba(255,46,209,.09); }
 table.rank tr.cutline td { border-bottom: 2px solid var(--lime); }
 table.rank tr.out td { opacity: .4; }
 table.rank tr.out td.l { text-decoration: line-through; }
@@ -274,6 +302,43 @@ table.rank tr.out td.l { text-decoration: line-through; }
   letter-spacing: .3em; color: var(--accent-fg); background: var(--surface);
   border: 2px solid var(--lime); border-radius: var(--r);
   padding: 8px 6px 8px 16px; flex: 0 0 auto; }
+
+/* 兩組碼並排：店員房號 + 選手查詢碼 */
+.codes { display: flex; flex-wrap: wrap; gap: 10px; }
+.codebox { flex: 1 1 200px; display: flex; flex-direction: column; gap: 3px;
+  background: var(--surface); border: 2px solid var(--line-hard);
+  border-radius: var(--r); padding: 10px 14px; }
+.codebox.staff { border-color: var(--lime); }
+.codebox.view  { border-color: var(--blue); }
+.codebox .lab { font-family: var(--f-mono); font-size: 10px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--faint); }
+.codebox .sub { font-size: 12px; color: var(--dim); }
+.codebox .roomcode { font-family: var(--f-mono); font-size: 28px; font-weight: 700;
+  letter-spacing: .28em; line-height: 1.2; background: none; border: 0; padding: 0; }
+.codebox.staff .roomcode { color: var(--accent-fg); }
+.codebox.view  .roomcode { color: var(--blue-soft); }
+
+/* 選手查詢模式：挑自己的名字，之後直接告訴他在第幾桌 */
+.mebar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px;
+  background: var(--surface); border: 2px solid var(--lime);
+  border-radius: var(--r); padding: 12px 16px; }
+.mebar .who { font-size: 17px; font-weight: 700; }
+.mebar .at { margin-left: auto; text-align: right; }
+.mebar .at b { display: block; font-family: var(--f-serif); font-size: 34px;
+  font-weight: 700; line-height: 1; color: var(--accent-fg); }
+.mebar .at span { font-family: var(--f-mono); font-size: 10px; letter-spacing: .16em;
+  color: var(--faint); }
+.mebar .rec { font-family: var(--f-mono); font-size: 14px; color: var(--dim); }
+.mebar button { min-height: 34px; font-size: 12px; padding: 0 10px; }
+.mt.mine .sd { border-color: var(--lime); }
+.mt.mine .tb { border-color: var(--lime); color: var(--accent-fg);
+               box-shadow: 0 0 0 3px var(--glow); }
+
+/* 選手查詢模式：什麼都不能改 */
+body.watch .tabs button[data-tab="tSetup"] { display: none; }
+body.watch #btnNext, body.watch #btnRepair, body.watch #btnTimer,
+body.watch .dropb, body.watch #btnPresent, body.watch .mt .dw { display: none; }
+body.watch .mt .sd { cursor: default; }
 
 /* 加入者（手機）只回報勝負，其他都不給碰 —— 避免在店裡誤觸改設定 */
 body.guest .tabs button[data-tab="tSetup"] { display: none; }
@@ -314,11 +379,16 @@ body.present #present { display: flex; }
 .pv-ft { flex: 0 0 auto; display: flex; align-items: center; gap: 1.5vw;
          padding: .85vw 2.1vw; border-top: 1px solid var(--label-line);
          font-size: 1.4vw; background: var(--bg); }
-.pv-ft .k { font-family: var(--f-mono); font-size: .9vw; letter-spacing: .2em;
-            text-transform: uppercase; color: var(--label-fg); }
+.pv-ft .k { display: flex; align-items: center; gap: .55vw; }
+.pv-ft .k .mk { width: 1.9vw; height: 1.9vw; flex: 0 0 auto;
+  background: url(../assets/mark.png) center/contain no-repeat; }
+.pv-ft .k .wm { width: 5.2vw; height: 1.1vw; flex: 0 0 auto;
+  background: url(../assets/wordmark.png) left center/contain no-repeat; }
+:root[data-theme="light"] .pv-ft .k .mk { background-image: url(../assets/mark-light.png); }
+:root[data-theme="light"] .pv-ft .k .wm { background-image: url(../assets/wordmark-light.png); }
 .pv-ft .k em { font-style: normal; font-family: var(--f-cn); font-size: 1.05vw;
-               letter-spacing: .02em; color: var(--fg); margin-left: .7vw;
-               text-transform: none; font-weight: 700; }
+               letter-spacing: .02em; color: var(--dim); margin-left: .35vw;
+               font-weight: 700; }
 .pv-ft .grow { flex: 1; }
 .pv-ft .exit { font-size: .95vw; color: var(--faint); }
 .pv-ft button { min-height: 2.4vw; font-size: .95vw; padding: 0 1vw;
@@ -375,10 +445,85 @@ body.present #present { display: flex; }
 .pv-rk em { flex: 0 0 auto; font-style: normal; font-family: var(--f-mono); color: var(--dim); }
 .pv-rk u { flex: 0 0 3.4vw; text-decoration: none; text-align: right;
            font-family: var(--f-mono); font-weight: 700; }
-.pv-rk.in { border-color: var(--lime); background: rgba(176,208,0,.08); }
+.pv-rk.in { border-color: var(--lime); background: rgba(255,46,209,.08); }
 .pv-rk.in b, .pv-rk.in u { color: var(--accent-fg); }
 .pv-rk.out { opacity: .35; }
 .pv-rk.out span { text-decoration: line-through; }
+
+/* ── 使用手冊 ───────────────────────────────────────── */
+
+/* 左下角那顆按鈕。永遠在，任何一頁都按得到 ——
+   店家第一次開這個網站、或現場忘記下一步，都是找它。 */
+#btnBook {
+  position: fixed; left: 14px; bottom: 14px; z-index: 70;
+  display: flex; align-items: center; gap: 8px;
+  min-height: 46px; padding: 0 16px 0 13px; border-radius: 999px;
+  background: var(--surface); border: 2px solid var(--line-hard);
+  color: var(--fg); font-size: 14px; font-weight: 700;
+  box-shadow: 0 6px 24px rgba(0,0,0,.34);
+}
+#btnBook::before {
+  content: ''; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--grad); flex: 0 0 auto;
+}
+#btnBook:hover { border-color: var(--purple); }
+body.present #btnBook { display: none; }
+@media (max-width: 560px) { #btnBook { left: 10px; bottom: 10px; font-size: 13px; } }
+
+#book { position: fixed; inset: 0; z-index: 80; background: var(--bg);
+        display: none; flex-direction: column; }
+#book.on { display: flex; }
+.bk-hd { flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-bottom: 2px solid var(--line-hard); background: var(--surface); }
+.bk-hd .mk { flex: 0 0 auto; width: 30px; height: 30px;
+  background: url(../assets/mark.png) center/contain no-repeat; }
+:root[data-theme="light"] .bk-hd .mk { background-image: url(../assets/mark-light.png); }
+.bk-hd h2 { font-size: 17px; font-weight: 900; letter-spacing: .04em; }
+.bk-hd .grow { flex: 1; }
+.bk-body { flex: 1 1 auto; overflow-y: auto; padding: 22px 16px 64px;
+           -webkit-overflow-scrolling: touch; }
+.bk-body .wrap { max-width: 760px; }
+
+/* 每一節就是現場的一個時間點，編號是真的順序，不是裝飾 */
+.bk-step { display: flex; gap: 14px; padding: 18px 0;
+           border-top: 1px solid var(--line); }
+.bk-step:first-of-type { border-top: 0; padding-top: 6px; }
+.bk-step > .no {
+  flex: 0 0 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--f-mono); font-size: 15px; font-weight: 700;
+  background: var(--grad); color: #FFF;
+}
+.bk-step > .no.plain { background: none; border: 2px solid var(--line-hard); color: var(--dim); }
+.bk-step > div { flex: 1 1 auto; min-width: 0; }
+.bk-step h3 { font-size: 18px; font-weight: 900; letter-spacing: .01em; margin-bottom: 6px; }
+.bk-step p  { font-size: 15px; color: var(--dim); line-height: 1.8; margin-bottom: 8px; }
+.bk-step p b { color: var(--fg); }
+.bk-step ul { margin: 0 0 8px; padding-left: 20px; font-size: 15px;
+              color: var(--dim); line-height: 1.8; }
+.bk-step li b { color: var(--fg); }
+.bk-step .key {
+  display: inline-block; font-family: var(--f-mono); font-size: 13px; font-weight: 700;
+  background: var(--surface-2); border: 1px solid var(--line-hard);
+  border-radius: 6px; padding: 1px 7px; color: var(--fg); white-space: nowrap;
+}
+.bk-note { background: var(--surface); border-left: 4px solid var(--purple);
+  border-radius: 0 var(--r) var(--r) 0; padding: 11px 14px; font-size: 14px;
+  color: var(--dim); line-height: 1.75; margin: 10px 0 4px; }
+.bk-note.warn { border-left-color: var(--gold); }
+.bk-note b { color: var(--fg); }
+.bk-lede { font-size: 16px; line-height: 1.85; color: var(--dim); margin-bottom: 20px; }
+.bk-lede b { color: var(--fg); }
+.bk-who { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 24px; }
+.bk-card { flex: 1 1 220px; background: var(--surface);
+  border: 2px solid var(--line-hard); border-radius: var(--r); padding: 13px 15px; }
+.bk-card .lab { font-family: var(--f-mono); font-size: 10px; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--faint); display: block; margin-bottom: 5px; }
+.bk-card b { font-size: 15px; display: block; margin-bottom: 3px; }
+.bk-card span { font-size: 13.5px; color: var(--dim); line-height: 1.7; }
+.bk-card.a { border-color: var(--blue); }
+.bk-card.b { border-color: var(--purple); }
+.bk-card.c { border-color: var(--lime); }
 
 /* ── 提示條 ─────────────────────────────────────────── */
 #toast { position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; display: none;
@@ -410,4 +555,22 @@ body.present #present { display: flex; }
   .nmcell i { background: #eee; color: #333; }
   h2.sec { color: #555; }
   h2.sec em { color: #111; }
+
+  /* 手冊開著就印手冊 —— 店家可以印一張貼在櫃檯 */
+  #book { display: none; }
+  #book.on { display: block !important; position: static; inset: auto;
+             background: #fff; color: #111; }
+  .bk-hd, #btnBook { display: none !important; }
+  .bk-body { overflow: visible; padding: 0; }
+  .bk-body .wrap { max-width: none; }
+  .bk-step { break-inside: avoid; border-top: .4pt solid #ccc; padding: 12pt 0; }
+  .bk-step h3 { color: #111; }
+  .bk-step p, .bk-step ul, .bk-lede, .bk-card span, .bk-note { color: #333; }
+  .bk-step > .no { background: #111 !important; color: #fff !important;
+                   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .bk-step > .no.plain { background: none !important; color: #666 !important;
+                         border-color: #999; }
+  .bk-note { background: #f4f4f6; border-left-color: #666; }
+  .bk-card { border-color: #999; }
+  .bk-step .key { background: #eee; border-color: #bbb; color: #111; }
 }

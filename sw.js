@@ -1,14 +1,25 @@
 /* NICEPLAY · Service Worker
    只做一件事：把整包程式快取起來，第一次載入之後就完全不需要網路。
    比賽資料存在 localStorage，本來就不經過這裡。 */
-const CACHE = 'niceplay-v1';
+const CACHE = 'niceplay-v2';
 const SHELL = [
-  './', './index.html', './manifest.json', './icon.svg',
-  './src/style.css', './src/engine.js', './src/store.js', './src/ui.js'
+  './', './index.html', './manifest.json',
+  './src/style.css', './src/engine.js', './src/store.js', './src/net.js', './src/ui.js',
+  './assets/mark.png', './assets/mark-light.png',
+  './assets/wordmark.png', './assets/wordmark-light.png',
+  './assets/lockup.png', './assets/lockup-light.png',
+  './assets/favicon-32.png', './assets/favicon-64.png', './assets/favicon-180.png',
+  './assets/icon-192.png'
 ];
 
+/* 一次 addAll，只要有一個檔 404 整批就都不會進快取 ——
+   所以改成一個一個放，少一個檔不會讓離線功能整個失效。 */
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => {}))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {

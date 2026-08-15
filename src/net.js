@@ -6,7 +6,8 @@
    三種角色
      off   單機。資料只在這臺瀏覽器裡（預設）
      host  主控。開房的那一臺，配對／下一輪都在這裡算
-     guest 加入者。手機或第二臺裝置，只能回報勝負
+     guest 店員。用主控房號加入，可以回報勝負
+     watch 選手。用觀眾碼加入，只能看 —— 伺服器會擋掉所有寫入
 
    同步策略跟伺服器對稱：
      · 主控把整份狀態推上去；加入者只送「回報勝負」這個小操作
@@ -65,7 +66,7 @@ function create(opts) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state: state })
     }).then(function (j) {
-      conn = { code: j.code, hostToken: j.hostToken, role: 'host' };
+      conn = { code: j.code, viewCode: j.viewCode, hostToken: j.hostToken, role: 'host' };
       saveConn(conn); lastRev = j.rev; online = true;
       listen();
       status('已開房 ' + j.code);
@@ -77,11 +78,13 @@ function create(opts) {
     code = String(code || '').trim().toUpperCase();
     if (!/^[A-Z0-9]{4,12}$/.test(code)) return Promise.reject(new Error('房號格式不對'));
     return api('/api/rooms/' + code).then(function (j) {
-      conn = { code: j.code, role: 'guest' };
+      /* 伺服器會告訴我們用的是哪一組碼 —— 觀眾碼就是唯讀 */
+      var role = j.readOnly ? 'watch' : 'guest';
+      conn = { code: code, role: role };
       saveConn(conn); lastRev = j.rev; online = true;
-      on.state(j.state, 'guest');
+      on.state(j.state, role);
       listen();
-      status('已加入 ' + j.code);
+      status(role === 'watch' ? '已進入查詢模式' : '已加入 ' + code);
       return conn;
     });
   }
@@ -164,7 +167,7 @@ function create(opts) {
 
   /* 加入者回報勝負 */
   function sendResult(round, table, value) {
-    if (!conn) return Promise.resolve(null);
+    if (!conn || conn.role === 'watch') return Promise.resolve(null);
     return api('/api/rooms/' + conn.code + '/action', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ op: 'result', round: round, table: table, value: value })
@@ -184,7 +187,7 @@ function create(opts) {
     if (!conn || !base) { status(''); return Promise.resolve(false); }
     return api('/api/rooms/' + conn.code).then(function (j) {
       lastRev = j.rev; online = true;
-      if (conn.role === 'guest') on.state(j.state, 'guest');
+      if (conn.role !== 'host') on.state(j.state, conn.role);
       listen();
       status('已接回 ' + conn.code);
       return true;
@@ -199,6 +202,7 @@ function create(opts) {
   return {
     get role() { return conn ? conn.role : 'off'; },
     get code() { return conn ? conn.code : ''; },
+    get viewCode() { return conn ? (conn.viewCode || '') : ''; },
     get online() { return online; },
     get server() { return base; },
     setServer: function (u) { base = String(u || '').replace(/\/+$/, ''); },
