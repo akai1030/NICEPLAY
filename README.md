@@ -86,7 +86,7 @@ python3 -m http.server 8123
 
 **前端**　靜態站，指向根目錄。Zeabur 已附 `zbpack.json`，Add Service → Git 選本 repo 即可。Cloudflare Pages / Netlify / GitHub Pages / Vercel 同理。
 
-改完前端、推上去之前先跑 `tools/stamp.sh`。CDN 會把 `.css` / `.js` 快取數小時而 `index.html` 每次回源，不蓋版本章的話使用者會拿到新 HTML 配舊 CSS。
+改完前端、推上去之前先跑 `tools/stamp.sh`。CDN 會把 `.css` / `.js` 快取數小時而 `index.html` 每次回源，不蓋版本章的話使用者會拿到新 HTML 配舊 CSS。Service Worker 的註冊網址也一併蓋 —— 那支檔案只認註冊時的網址，沒帶版本就得等快取自己過期。
 
 **房間伺服器**（選配）　Add Service → Git → Root Directory 設為 `server`。
 

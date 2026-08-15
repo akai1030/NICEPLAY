@@ -12,8 +12,9 @@ cd "$(dirname "$0")/.."
 V=$(date +%Y%m%d%H%M)
 
 perl -pi -e "s/(src\/[a-z]+\.(?:css|js))\?v=\d+/\$1?v=$V/g; s/(src\/[a-z]+\.(?:css|js))\"/\$1?v=$V\"/g" index.html
+perl -pi -e "s/sw\.js\?v=\d+/sw.js?v=$V/g" index.html
 perl -pi -e "s/^const VERSION = '.*';/const VERSION = '$V';/" sw.js
 
 echo "版本 $V"
-grep -o "src/[a-z]*\.\(css\|js\)?v=[0-9]*" index.html | sed 's/^/  /'
+grep -o "\(src/[a-z]*\.\(css\|js\)\|sw\.js\)?v=[0-9]*" index.html | sed 's/^/  /'
 grep -n "^const VERSION" sw.js | sed 's/^/  /'
