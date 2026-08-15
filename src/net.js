@@ -50,11 +50,18 @@ function create(opts) {
     on.status({ role: conn ? conn.role : 'off', code: conn ? conn.code : '',
                 online: online, msg: msg || '', bad: !!bad });
   }
+  /* 回應一定要是 JSON 物件才算數。
+     不檢查的話，任何中間層（Service Worker 的離線後備、公共 Wi-Fi 的
+     登入攔截頁、CDN 的錯誤頁）回一頁 HTML 都會被當成「連上了但沒有新資料」，
+     畫面看起來正常、其實整場都沒在同步 —— 那比直接報錯難查太多。 */
   function api(path, init) {
     if (!base) return Promise.reject(new Error('沒有設定伺服器位址'));
     return fetch(base + path, init).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (j) {
-        if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      return r.text().then(function (body) {
+        var j = null;
+        try { j = JSON.parse(body); } catch (e) { j = null; }
+        if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+        if (!j || typeof j !== 'object') throw new Error('伺服器回的不是 JSON');
         return j;
       });
     });

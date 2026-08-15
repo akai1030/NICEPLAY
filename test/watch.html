@@ -1,91 +1,210 @@
-<!doctype html><html><head><meta charset="utf-8"></head><body>
-<iframe id="h" style="width:700px;height:800px;border:0"></iframe>
-<iframe id="w" style="width:420px;height:800px;border:0"></iframe>
+<!doctype html>
+<html><head><meta charset="utf-8"><title>NICEPLAY 店員／選手分流測試</title></head>
+<body style="margin:0;background:#111;color:#eee;font:13px/1.6 monospace">
+<div style="display:flex;gap:6px">
+  <iframe id="h" style="width:620px;height:820px;border:0"></iframe>
+  <iframe id="s" style="width:380px;height:820px;border:0"></iframe>
+  <iframe id="p" style="width:380px;height:820px;border:0"></iframe>
+</div>
 <pre id="out">RUNNING</pre>
 <script>
-(function(){
- var L=[],fails=0;
- function say(s){L.push(s);document.getElementById('out').textContent=L.join('\n');}
- function ok(c,m){if(!c){fails++;say('  ✗ '+m);}}
- var sleep=ms=>new Promise(r=>setTimeout(r,ms));
- var SRV=new URLSearchParams(location.search).get('srv');
- var H=document.getElementById('h'),V=document.getElementById('w');
- function D(f){return f.contentDocument;} function W(f){return f.contentWindow;}
- function el(f,i){return D(f).getElementById(i);}
- function click(f,n){if(!n){fails++;say('  ✗ 元素不存在');return;}
-   var e=D(f).createEvent('MouseEvents');e.initEvent('click',true,true);n.dispatchEvent(e);}
- function setVal(f,id,v){var n=el(f,id);n.value=v;
-   ['input','change'].forEach(t=>{var e=D(f).createEvent('HTMLEvents');e.initEvent(t,true,true);n.dispatchEvent(e);});}
- function kill(f){try{W(f).BroadcastChannel=undefined;W(f).EventSource=undefined;}catch(e){}}
- function load(f,u){return new Promise(r=>{f.onload=()=>r();f.src=u;});}
- (async()=>{
-  await load(H,'../index.html'); W(H).localStorage.clear();
-  await load(H,'../index.html'); kill(H); await sleep(400);
+/* 三個 iframe：主控（筆電）／店員（手機）／選手（手機）。
+   上一版的測試只檢查了「按鈕有沒有藏起來」，
+   結果漏掉最嚴重的一個 —— 選手重整之後停在設定頁，
+   看得到房號、開始比賽、全部清除重來。
+   所以這一版改成檢查「選手到底看得到哪一個畫面」。 */
+(function () {
+  var L = [], fails = 0;
+  function say(s) { L.push(s); document.getElementById('out').textContent = L.join('\n'); }
+  function ok(c, m) { if (!c) { fails++; say('  ✗ ' + m); } }
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 
-  say('【1】預設伺服器位址');
-  ok(el(H,'fServer').value.indexOf('http')===0,'伺服器欄位沒有預設值：'+el(H,'fServer').value);
-  say('  已預填 '+el(H,'fServer').value+' ✓');
+  var SRV = new URLSearchParams(location.search).get('srv') || 'http://127.0.0.1:8799';
+  var H = document.getElementById('h'), S = document.getElementById('s'),
+      P = document.getElementById('p');
 
-  say('【2】未連線時不該出現「你是加入者」');
-  ok(el(H,'netOn').offsetParent===null,'netOn 沒有被藏起來（hidden 被 CSS 蓋掉）');
-  say('  netOn 正確隱藏 ✓');
+  function D(f) { return f.contentDocument; }
+  function W(f) { return f.contentWindow; }
+  function el(f, i) { return D(f).getElementById(i); }
+  /* offsetParent 對 position:fixed 的元素永遠是 null，
+     拿它判斷「看不看得見」會把整個投影／選手覆蓋層誤判成隱藏。
+     改成看實際佔不佔面積。 */
+  function vis(f, i) {
+    var n = el(f, i);
+    if (!n) return false;
+    var r = n.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+  function click(f, n) {
+    if (!n) { fails++; say('  ✗ 找不到元素'); return; }
+    var e = D(f).createEvent('MouseEvents'); e.initEvent('click', true, true); n.dispatchEvent(e);
+  }
+  function setVal(f, id, v) {
+    var n = el(f, id); n.value = v;
+    ['input', 'change'].forEach(function (t) {
+      var e = D(f).createEvent('HTMLEvents'); e.initEvent(t, true, true); n.dispatchEvent(e);
+    });
+  }
+  /* 同一個瀏覽器裡三個 iframe 會經 BroadcastChannel 直接同步，
+     那樣就測不到伺服器；SSE 在 headless 的虛擬時間下不會結束。兩個都關掉。 */
+  function iso(f) {
+    try { W(f).BroadcastChannel = undefined; W(f).EventSource = undefined; } catch (e) {}
+  }
+  /* 只換 hash 的話瀏覽器當成同頁導覽，onload 不會再觸發，
+     等 onload 的 promise 就永遠不會 resolve —— 所以每次都加一個
+     不重複的查詢字串，強迫它真的重新載入。 */
+  var seq = 0;
+  function load(f, url) {
+    var i = url.indexOf('#');
+    var path = i < 0 ? url : url.slice(0, i);
+    var hash = i < 0 ? '' : url.slice(i);
+    var full = path + (path.indexOf('?') < 0 ? '?' : '&') + 'n=' + (++seq) + hash;
+    return new Promise(function (res) { f.onload = function () { res(); }; f.src = full; });
+  }
 
-  setVal(H,'fServer',SRV);
-  setVal(H,'fPlayers','王小明\n陳小美\n林阿明\n李大華');
-  click(H,el(H,'btnParse')); await sleep(200);
-  setVal(H,'fMinutes','0'); click(H,el(H,'btnStart')); await sleep(400);
+  (async function () {
+    say('【0】空白狀態下分頁點得下去，而且會說要做什麼');
+    var F = document.createElement('iframe');
+    F.style.cssText = 'width:600px;height:500px;border:0;position:absolute;left:-9999px';
+    document.body.appendChild(F);
+    await load(F, '../index.html'); iso(F); W(F).localStorage.clear();
+    await load(F, '../index.html'); iso(F); await sleep(500);
+    var tp = D(F).querySelector('.tabs button[data-tab="tPlay"]');
+    ok(!tp.disabled, '對戰分頁還是 disabled');
+    click(F, tp); await sleep(200);
+    ok(el(F, 'tPlay').classList.contains('on'), '點了對戰分頁沒有切過去');
+    ok(!el(F, 'playEmpty').hidden, '沒有顯示空狀態說明');
+    ok(el(F, 'playEmptyWhy').textContent.indexOf('名單') >= 0,
+       '空狀態沒告訴人要去貼名單：' + el(F, 'playEmptyWhy').textContent);
+    click(F, el(F, 'btnGoSetup')); await sleep(200);
+    ok(el(F, 'tSetup').classList.contains('on'), '「回設定頁」沒有作用');
+    say('  ' + el(F, 'playEmptyWhy').textContent.trim() + ' ✓');
 
-  say('【3】開房拿到兩組碼');
-  click(H,el(H,'btnHost')); await sleep(1200);
-  var code=el(H,'roomCode').textContent.trim(), view=el(H,'viewCode').textContent.trim();
-  ok(/^[A-Z0-9]{6}$/.test(code),'店員房號不對：'+code);
-  ok(/^[A-Z0-9]{6}$/.test(view),'選手查詢碼不對：'+view);
-  ok(code!==view,'兩組碼一樣');
-  say('  店員 '+code+' · 選手 '+view+' ✓');
+    /* ── 主控開賽並開房 ─────────────────────── */
+    say('\n【1】主控開賽、開房');
+    await load(H, '../index.html');
+    W(H).localStorage.clear();
+    await load(H, '../index.html'); iso(H); await sleep(400);
 
-  say('【4】選手用查詢碼進來');
-  await load(V,'../index.html'); kill(V); W(V).localStorage.clear();
-  await load(V,'../index.html'); kill(V); await sleep(400);
-  setVal(V,'fServer',SRV); setVal(V,'fJoin',view);
-  click(V,el(V,'btnJoin')); await sleep(1500);
-  ok(D(V).body.classList.contains('watch'),'沒有進入查詢模式');
-  ok(!D(V).body.classList.contains('guest'),'誤判成可回報的加入者');
-  var st=()=>JSON.parse(W(V).localStorage.getItem('niceplay.state.v1'));
-  ok(st().players.length===4,'沒拿到名單');
-  say('  進入查詢模式、拿到 4 人名單 ✓');
+    setVal(H, 'fName', '分流測試賽');
+    setVal(H, 'fPlayers', '王小明\n陳小美\n林阿明\n李大華');
+    click(H, el(H, 'btnParse')); await sleep(200);
+    setVal(H, 'fMinutes', '0');
+    setVal(H, 'fServer', SRV);
+    click(H, el(H, 'btnStart')); await sleep(400);
+    click(H, el(H, 'btnHost')); await sleep(1400);
 
-  say('【5】查詢模式什麼都不能改');
-  ['btnNext','btnRepair','btnTimer'].forEach(id=>{
-    ok(W(V).getComputedStyle(el(V,id)).display==='none',id+' 應該藏起來');});
-  ok(W(V).getComputedStyle(D(V).querySelector('.tabs button[data-tab="tSetup"]')).display==='none',
-     '設定分頁應該藏起來');
-  var before=JSON.stringify(st().matches);
-  click(V,D(V).querySelectorAll('#matchList .mt')[0].querySelectorAll('.sd')[0]);
-  await sleep(1200);
-  ok(JSON.stringify(st().matches)===before,'查詢模式竟然改得動勝負');
-  say('  按鈕全藏、點下去也改不了 ✓');
+    var staffURL = el(H, 'urlStaff').value;
+    var pw       = el(H, 'pwStaff').value;
+    var viewURL  = el(H, 'urlView').value;
+    ok(/#staff(&|$)/.test(staffURL), '店員網址不對：' + staffURL);
+    ok(/^[A-Z0-9]{6}$/.test(pw), '店員密碼不對：' + pw);
+    ok(/#join=[A-Z0-9]{6}(&|$)/.test(viewURL), '選手網址不對：' + viewURL);
+    ok(staffURL.indexOf('srv=') > 0, '自架伺服器時連結沒有帶位址：' + staffURL);
+    ok(viewURL.indexOf(pw) < 0, '選手網址裡竟然含有店員密碼');
+    say('  店員 ' + staffURL.replace(/^https?:\/\/[^/]*/, '') + ' + 密碼 ' + pw);
+    say('  選手 ' + viewURL.replace(/^https?:\/\/[^/]*/, '') + ' ✓');
 
-  say('【6】伺服器端真的擋（不是只藏按鈕）');
-  var r=await fetch(SRV+'/api/rooms/'+view+'/action',{method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({op:'result',round:1,table:'1',value:'a'})});
-  ok(r.status===403,'直接打 API 竟然沒被擋，HTTP '+r.status);
-  say('  繞過前端直接打 API → HTTP 403 ✓');
+    say('\n【2】沒有大字房號了，改成可複製的欄位');
+    ok(!D(H).querySelector('.roomcode'), '還留著大字房號');
+    ok(el(H, 'urlStaff').tagName === 'INPUT', '店員網址不是可複製的輸入框');
+    say('  兩條都是 readonly input，旁邊有複製鈕 ✓');
 
-  say('【7】選手挑自己的名字');
-  ok(!el(V,'mePanel').hidden,'沒有出現「你是哪一位」');
-  var chips=D(V).querySelectorAll('#meList .nm');
-  ok(chips.length===4,'名字選單應該 4 個，實際 '+chips.length);
-  click(V,chips[0]); await sleep(400);
-  var bar=el(V,'meBar');
-  ok(!bar.hidden,'選完之後沒有顯示你在第幾桌');
-  ok(bar.textContent.indexOf('王小明')>=0,'沒顯示名字');
-  ok(/第|輪空/.test(bar.textContent),'沒顯示桌號');
-  ok(D(V).querySelectorAll('#matchList .mt.mine').length===1,'沒有高亮自己那一桌');
-  say('  '+bar.textContent.replace(/\s+/g,' ').trim().slice(0,54)+' ✓');
+    say('\n【3】投影畫面右下角有常駐 QR');
+    ok(!el(H, 'pvQR').hidden, '投影 QR 沒有出現');
+    ok(D(H).querySelector('#pvQRImg svg'), 'QR 沒有畫出來');
+    say('  pvQR 已顯示，SVG 有內容 ✓');
 
-  say('');
-  say(fails===0?'選手查詢模式全部通過 ✅':'有 '+fails+' 項失敗 ❌'); say('DONE');
- })().catch(e=>{say('EX '+e.message+'\n'+e.stack);say('DONE');});
+    /* ── 店員：網址 + 密碼 ─────────────────── */
+    say('\n【4】店員：打開網址看到密碼輸入畫面');
+    var staffHash = staffURL.slice(staffURL.indexOf('#'));
+    await load(S, '../index.html'); iso(S); W(S).localStorage.clear();
+    await load(S, '../index.html' + staffHash); iso(S); await sleep(600);
+    ok(D(S).body.classList.contains('staffgate'), '沒有進入店員密碼畫面');
+    ok(vis(S, 'stCode'), '看不到密碼輸入框');
+    ok(!vis(S, 'fPlayers'), '店員竟然看得到設定頁的名單框');
+    ok(!vis(S, 'btnStart'), '店員竟然看得到「開始比賽」');
+    say('  只有一個密碼框，設定頁完全看不到 ✓');
+
+    say('\n【5】店員輸入密碼進去');
+    setVal(S, 'stCode', pw);
+    click(S, el(S, 'btnStJoin')); await sleep(1600);
+    ok(!D(S).body.classList.contains('staffgate'), '密碼對了卻還卡在輸入畫面');
+    ok(D(S).body.classList.contains('guest'), '沒有進入店員模式');
+    ok(el(S, 'tPlay').classList.contains('on'), '沒有自動切到對戰頁');
+    ok(!vis(S, 'fPlayers'), '店員看得到設定頁的名單框');
+    ok(!vis(S, 'btnStart'), '店員看得到「開始比賽」');
+    ok(!vis(S, 'btnReset'), '店員看得到「全部清除重來」');
+    say('  進到對戰頁，設定頁的東西一個都看不到 ✓');
+
+    say('\n【6】店員可以回報，主控收得到');
+    var card = D(S).querySelectorAll('#matchList .mt')[0];
+    var tbl = card.querySelector('.tb').textContent.trim();
+    click(S, card.querySelectorAll('.sd')[0]);
+    await sleep(2400);
+    var hs = JSON.parse(W(H).localStorage.getItem('niceplay.state.v1'));
+    var hm = hs.matches.filter(function (m) { return String(m.table) === tbl; })[0];
+    ok(hm && hm.result === 'a', '主控沒收到店員的回報');
+    say('  店員點第 ' + tbl + ' 桌 → 主控收到 ✓');
+
+    /* ── 選手：掃 QR 進來，零輸入 ─────────── */
+    say('\n【7】選手：連結一開就進查詢畫面，不用打任何東西');
+    var joinHash = viewURL.slice(viewURL.indexOf('#'));
+    await load(P, '../index.html'); iso(P); W(P).localStorage.clear();
+    await load(P, '../index.html' + joinHash); iso(P); await sleep(1800);
+    ok(D(P).body.classList.contains('player'), '沒有進入選手畫面');
+    ok(vis(P, 'watch'), '選手畫面沒有顯示');
+    say('  #join= 直接進去 ✓');
+
+    say('\n【8】選手看不到任何控制台的東西');
+    ['fPlayers', 'btnStart', 'btnReset', 'btnHost', 'fServer',
+     'btnNext', 'btnRepair', 'btnTimer', 'btnPresent', 'btnBook'].forEach(function (id) {
+      ok(!vis(P, id), '選手竟然看得到 #' + id);
+    });
+    ok(!vis(P, 'tSetup'), '選手看得到設定頁');
+    ok(!D(P).querySelector('.tabs').offsetParent, '選手看得到分頁列');
+    say('  設定、開始比賽、清除重來、分頁列 —— 一個都看不到 ✓');
+
+    say('\n【9】選手挑自己的名字 → 直接寫第幾桌');
+    var chips = D(P).querySelectorAll('#meList .nm');
+    ok(chips.length === 4, '名字選單應該 4 個，實際 ' + chips.length);
+    click(P, chips[0]); await sleep(400);
+    ok(el(P, 'wtMe').hidden === false, '選完之後沒有顯示');
+    ok(el(P, 'wtPlayer').textContent === '王小明', '名字不對：' + el(P, 'wtPlayer').textContent);
+    ok(/^[0-9A-Z]+$/.test(el(P, 'wtTable').textContent.trim()) ||
+       el(P, 'wtTable').textContent.indexOf('輪空') >= 0,
+       '桌號沒出來：' + el(P, 'wtTable').textContent);
+    ok(el(P, 'wtOpp').textContent.indexOf('對手') >= 0, '沒寫對手是誰');
+    ok(el(P, 'wtStat').textContent.indexOf('名') >= 0, '沒寫目前第幾名');
+    ok(D(P).querySelectorAll('#wtMatches .wr.mine').length === 1, '對戰表沒有標出自己那一桌');
+    say('  ' + el(P, 'wtPlayer').textContent + ' → 第 ' +
+        el(P, 'wtTable').textContent + ' 桌 · ' +
+        el(P, 'wtOpp').textContent.replace(/\s+/g, ' ').trim() + ' · ' +
+        el(P, 'wtStat').textContent.trim() + ' ✓');
+
+    say('\n【10】選手重整之後還是選手畫面（上一版就是這裡壞掉）');
+    await load(P, '../index.html' + joinHash); iso(P); await sleep(1800);
+    ok(D(P).body.classList.contains('player'), '重整後掉出選手畫面');
+    ok(!vis(P, 'fPlayers'), '重整後看得到設定頁的名單框');
+    ok(!vis(P, 'btnReset'), '重整後看得到「全部清除重來」');
+    ok(el(P, 'wtPlayer').textContent === '王小明', '重整後忘記選手是誰');
+    say('  重整後仍在選手畫面，記得是誰 ✓');
+
+    say('\n【11】選手改不動勝負（伺服器擋，不是只藏按鈕）');
+    var vcode = joinHash.replace('#join=', '').split('&')[0];
+    var bad = await fetch(SRV + '/api/rooms/' + vcode + '/action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'result', round: 1, table: '1', value: 'b' })
+    });
+    ok(bad.status === 403, '繞過前端直接打 API 竟然沒被擋，HTTP ' + bad.status);
+    say('  直接打 API → HTTP 403 ✓');
+
+    /* ── 分頁不再灰掉 ─────────────────────── */
+    say('');
+    say(fails === 0 ? '店員／選手分流全部通過 ✅' : '有 ' + fails + ' 項失敗 ❌');
+    say('DONE');
+  })().catch(function (e) { say('EXCEPTION ' + e.message + '\n' + e.stack); say('DONE'); });
 })();
-</script></body></html>
+</script>
+</body>
+</html>

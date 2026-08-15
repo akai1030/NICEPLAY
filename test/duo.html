@@ -67,8 +67,8 @@
 
     /* ── 開房 ────────────────────────────── */
     say('\n【2】開房');
-    click(H, el(H, 'btnHost')); await sleep(900);
-    var code = el(H, 'roomCode').textContent.trim();
+    click(H, el(H, 'btnHost')); await sleep(1200);
+    var code = el(H, 'pwStaff').value.trim();      /* 店員密碼＝主控房號 */
     ok(/^[A-Z0-9]{6}$/.test(code), '房號格式不對：' + code);
     ok(el(H, 'netPill').textContent.indexOf('主控') === 0, '沒有顯示主控狀態');
     say('  房號 ' + code + ' · 頂列顯示「' + el(H, 'netPill').textContent + '」✓');
@@ -84,7 +84,7 @@
     await sleep(400);
     setVal(G, 'fServer', SRV);
     setVal(G, 'fJoin', code);
-    click(G, el(G, 'btnJoin')); await sleep(1000);
+    click(G, el(G, 'btnJoin')); await sleep(1400);
 
     var gs = function () { return JSON.parse(W(G).localStorage.getItem('niceplay.state.v1')); };
     ok(gs() && gs().players.length === 6, '手機沒拿到名單');

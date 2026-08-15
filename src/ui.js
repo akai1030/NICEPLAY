@@ -91,7 +91,7 @@ document.querySelectorAll('.tabs button').forEach(function (b) {
 });
 function goTab(id) {
   var b = document.querySelector('.tabs button[data-tab="' + id + '"]');
-  if (b && !b.disabled) b.click();
+  if (b) b.click();
 }
 
 /* ── 設定：表單 ⇄ 狀態 ──────────────────────────────── */
@@ -395,92 +395,209 @@ addEventListener('keydown', function (e) {
 });
 
 /* ── 連線 ─────────────────────────────────────────────
-   開房＝這臺當主控，配對與下一輪都在這裡算；
-   加入＝只能回報勝負。房號即權限，不需要帳號。      */
+   開房＝這臺當主控，配對與下一輪都在這裡算。
+
+   給出去的東西分成兩種，因為兩種人的處境完全不一樣：
+
+     店員　拿「網址 ＋ 密碼」。密碼不寫在網址裡 —— 網址會在群組裡
+           被轉來轉去，密碼才是真正的權限。他打開網址會看到一個
+           只有輸入框的畫面，輸入密碼就進去。
+     選手　掃投影畫面上的 QR，或拿一條把查詢碼寫在裡面的網址。
+           零輸入。反正查詢碼只能看，公開也沒差。            */
+
+function siteURL() {
+  return location.origin + location.pathname.replace(/index\.html$/, '');
+}
+/* 自己架伺服器的店家，發出去的連結要把位址帶著走 ——
+   不然店員與選手會連到官方那臺，然後看到「找不到這個房號」。
+   用官方位址的時候不加，連結才短。 */
+function srvTail() {
+  var sv = net.server;
+  return (!sv || sv === DEFAULT_SERVER) ? '' : '&srv=' + encodeURIComponent(sv);
+}
+function staffURL() { return siteURL() + '#staff' + srvTail(); }
+function viewURL(code) { return siteURL() + '#join=' + code + srvTail(); }
+
 function paintNet(st) {
   var pill = el('netPill');
   var role = st.role;
   pill.hidden = (role === 'off');
   pill.className = 'netpill ' + (st.bad ? 'bad' : role);
   pill.textContent = role === 'off' ? '' : ({
-    host: '主控 ', guest: '加入 ', watch: '查詢 '
+    host: '主控 ', guest: '店員 ', watch: '查詢 '
   }[role] || '') + st.code + (st.online ? '' : ' · 斷線');
 
   el('netOff').hidden = (role !== 'off');
-  el('netOn').hidden = (role === 'off');
-  el('roomCode').textContent = role === 'host' ? net.code : st.code;
-  el('viewBox').hidden = (role !== 'host');
-  el('viewCode').textContent = net.viewCode || '——';
+  el('netOn').hidden = (role !== 'host');
 
-  el('roomHint').innerHTML =
-    role === 'host'
-      ? '<b>店員房號</b>唸給要幫忙回報的人；<b>選手查詢碼</b>可以公開貼出來，' +
-        '拿到的人只能看，改不了任何東西。'
-      : role === 'watch'
-        ? '<b>查詢模式</b>：可以看對戰表與名次，不能修改。'
-        : '<b>你是加入者</b>：可以回報勝負，配對與下一輪由主控那臺決定。';
+  if (role === 'host') {
+    el('urlStaff').value = staffURL();
+    el('pwStaff').value = net.code;
+    el('urlView').value = viewURL(net.viewCode);
+    el('roomCode').value = net.code;
+    el('viewCode').value = net.viewCode;
+    el('roomHint').innerHTML =
+      '兩邊都不用打房號：店員貼網址、輸入密碼；選手掃 QR。<br>' +
+      '房間會在最後一次操作的 36 小時後自動消失。';
+  }
 
-  document.body.classList.toggle('guest', role === 'guest');
-  document.body.classList.toggle('watch', role === 'watch');
+  /* 角色是連線層決定的，會比「收到狀態」晚一步到 ——
+     所以身分一變就要再畫一次，不然選手畫面會停在空的。 */
+  var was = document.body.className;
+  document.body.classList.toggle('guest',  role === 'guest');
+  document.body.classList.toggle('player', role === 'watch');
+  /* 密碼畫面只由它自己開關（輸入成功、或按「我不是店員」）。
+     這裡不要碰 —— 之前寫成「不是選手就關掉」，結果這臺剛好是主控的話，
+     一開 #staff 就被自己的狀態推播關掉，直接掉回設定頁。 */
+
+  paintPvQR();
   if (st.msg) toast(st.msg, st.bad);
+  if (document.body.className !== was) render(store.get());
 }
 
-/* ── 選手查詢模式：我是誰、我在第幾桌 ─────────────── */
+/* 複製按鈕。navigator.clipboard 在非 HTTPS 或舊瀏覽器不存在，
+   所以保留 select + execCommand 那條老路 —— 現場最不需要的就是
+   「複製沒反應」。 */
+function copyFrom(id, btn) {
+  var input = el(id), text = input.value;
+  var done = function () {
+    if (!btn) return;
+    var old = btn.textContent;
+    btn.textContent = '已複製'; btn.classList.add('done');
+    setTimeout(function () { btn.textContent = old; btn.classList.remove('done'); }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, function () { legacy(); });
+  } else { legacy(); }
+  function legacy() {
+    try {
+      input.removeAttribute('hidden');
+      input.select(); input.setSelectionRange(0, 999);
+      document.execCommand('copy');
+      done();
+    } catch (e) { toast('複製不了，請長按選取：' + text, true); }
+  }
+}
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('[data-copy]');
+  if (b) copyFrom(b.dataset.copy, b);
+});
+
+/* ── QR ───────────────────────────────────────────────
+   自己畫，不載任何外部服務 —— 現場常常只有一支手機熱點，
+   而且把房號送到第三方產圖網站也不像話。 */
+function qrSVG(text, size) {
+  if (!window.QR) return '';
+  try { return QR.svg(text, { size: size, margin: 2, ecc: 'M' }); }
+  catch (e) { return ''; }
+}
+function paintPvQR() {
+  var box = el('pvQR');
+  if (!box) return;
+  var on = (net.role === 'host' && net.viewCode);
+  box.hidden = !on;
+  if (!on) { box._url = ''; return; }
+  var url = viewURL(net.viewCode);
+  if (box._url === url) return;                 /* 沒變就不要重畫 */
+  box._url = url;
+  el('pvQRImg').innerHTML = qrSVG(url, 240);
+}
+el('btnQR').onclick = function () {
+  var url = el('urlView').value;
+  el('qrImg').innerHTML = qrSVG(url, 640);
+  el('qrUrl').textContent = url;
+  el('qrbox').classList.add('on');
+};
+el('btnQRClose').onclick = function () { el('qrbox').classList.remove('on'); };
+el('qrbox').onclick = function (e) { if (e.target === el('qrbox')) el('btnQRClose').onclick(); };
+
+/* ── 選手查詢畫面 ─────────────────────────────────────
+   完全獨立的一頁。選手要知道的只有三件事：
+   我在第幾桌、本輪誰打誰、我現在第幾名。                */
 var meId = localStorage.getItem(ME_KEY) || '';
 
-function paintMe(st) {
-  var panel = el('mePanel');
-  if (net.role !== 'watch') { panel.hidden = true; return; }
-  panel.hidden = false;
+function paintWatch(st) {
+  el('wtName').textContent = st.event.name || '賽事進行中';
+  var r = currentRound(st);
+  el('wtRound').textContent = r === null ? '尚未開始' : roundLabel(r);
+  el('wtCode').textContent = net.code ? '查詢碼 ' + net.code : '';
 
   var me = null;
   st.players.forEach(function (p) { if (p.id === meId) me = p; });
 
+  el('wtPick').hidden = !!me;
+  el('wtMe').hidden = !me;
+
   if (!me) {
-    el('meBar').hidden = true;
-    el('mePick').hidden = false;
     el('meList').innerHTML = st.players.map(function (p) {
       return '<div class="nm" data-id="' + p.id + '"><i>' + p.no + '</i>' +
              '<span>' + esc(p.name) + '</span></div>';
-    }).join('');
-    return;
+    }).join('') || '<div class="hint">主辦還沒讀入名單。</div>';
+  } else {
+    el('wtPlayer').textContent = me.name;
+
+    var mine = null;
+    matchesOf(st, r).forEach(function (m) { if (m.a === meId || m.b === meId) mine = m; });
+
+    if (!mine) {
+      el('wtLead').textContent = ''; el('wtTail').textContent = '';
+      el('wtTable').textContent = r === null ? '尚未開始' : '本輪沒有你的場次';
+      el('wtTable').style.fontSize = '26px';
+      el('wtOpp').textContent = '';
+    } else if (mine.b === null || mine.b === undefined) {
+      el('wtLead').textContent = '本輪'; el('wtTail').textContent = '';
+      el('wtTable').textContent = '輪空';
+      el('wtTable').style.fontSize = '';
+      el('wtOpp').innerHTML = '這一輪不用打，直接算一勝。';
+    } else {
+      el('wtLead').textContent = '你在第'; el('wtTail').textContent = '桌';
+      el('wtTable').textContent = mine.table;
+      el('wtTable').style.fontSize = '';
+      var oppId = (mine.a === meId) ? mine.b : mine.a;
+      var res = mine.result;
+      var mineIsA = (mine.a === meId);
+      var tail = !res ? '' :
+        res === 'draw' ? '　<b>平手</b>' :
+        ((res === 'a') === mineIsA ? '　<b>你贏了</b>' : '　你輸了');
+      el('wtOpp').innerHTML = '對手　<b>' + esc(nameOf(st, oppId)) + '</b>' + tail;
+    }
+
+    var rows = E.standings(st.players, st.matches, st.config.rules);
+    var row = null;
+    rows.forEach(function (x) { if (x.id === meId) row = x; });
+    el('wtStat').textContent = row
+      ? '目前第 ' + row.rank + ' 名　' + row.w + ' 勝 ' + row.l + ' 敗' +
+        (row.d ? ' ' + row.d + ' 平' : '') + '　' + row.pts + ' 分'
+      : '';
   }
 
-  el('mePick').hidden = true;
-  el('meBar').hidden = false;
+  /* 本輪對戰（唯讀） */
+  var ms = (r === null) ? [] : matchesOf(st, r);
+  el('wtMatchTitle').textContent = r === null ? '本輪對戰' : roundLabel(r) + '　對戰';
+  el('wtMatches').innerHTML = ms.length ? ms.map(function (m) {
+    var isMine = (m.a === meId || m.b === meId);
+    var bye = (m.b === null || m.b === undefined);
+    var ca = m.result === 'a' ? ' win' : (m.result === 'b' ? ' lose' : '');
+    var cb = m.result === 'b' ? ' win' : (m.result === 'a' ? ' lose' : '');
+    return '<div class="wr' + (isMine ? ' mine' : '') + '">' +
+      '<span class="t">' + esc(m.table) + '</span>' +
+      '<span class="p' + ca + '">' + esc(nameOf(st, m.a)) + '</span>' +
+      (bye ? '<span class="s">輪空</span>'
+           : '<span class="x">VS</span><span class="p' + cb + '">' +
+             esc(nameOf(st, m.b)) + '</span>') +
+      '</div>';
+  }).join('') : '<div class="hint">還沒排對戰。</div>';
 
-  var r = currentRound(st);
-  var mine = null;
-  matchesOf(st, r).forEach(function (m) {
-    if (m.a === meId || m.b === meId) mine = m;
-  });
-  var rows = E.standings(st.players, st.matches, st.config.rules);
-  var row = null;
-  rows.forEach(function (x) { if (x.id === meId) row = x; });
-
-  var at = mine
-    ? (mine.b === null || mine.b === undefined
-        ? '<span>本輪</span><b>輪空</b>'
-        : '<span>你在第</span><b>' + esc(mine.table) + '</b><span>桌</span>')
-    : '<span>本輪</span><b>—</b>';
-
-  var opp = '';
-  if (mine && mine.b !== null && mine.b !== undefined) {
-    opp = '對手　' + esc(nameOf(st, mine.a === meId ? mine.b : mine.a));
-  }
-
-  el('meBar').innerHTML =
-    '<span class="who">' + esc(me.name) + '</span>' +
-    '<span class="rec">' + (row ? '第 ' + row.rank + ' 名　' + row.w + '-' + row.l +
-      (row.d ? '-' + row.d : '') + '　' + row.pts + ' 分' : '') + '</span>' +
-    '<span class="rec">' + opp + '</span>' +
-    '<button class="sm" id="btnNotMe">不是我</button>' +
-    '<span class="at">' + at + '</span>';
-
-  var b = el('btnNotMe');
-  if (b) b.onclick = function () {
-    meId = ''; localStorage.removeItem(ME_KEY); render(store.get());
-  };
+  /* 名次（唯讀） */
+  var rk = E.standings(st.players, st.matches, st.config.rules);
+  el('wtRank').innerHTML = rk.length ? rk.map(function (x) {
+    return '<div class="wr' + (x.id === meId ? ' mine' : '') + '">' +
+      '<span class="n">' + x.rank + '</span>' +
+      '<span class="p">' + esc(x.name) + (x.dropped ? '（退賽）' : '') + '</span>' +
+      '<span class="s">' + x.w + '-' + x.l + (x.d ? '-' + x.d : '') + '</span>' +
+      '<span class="s">' + x.pts + ' 分</span>' +
+      '</div>';
+  }).join('') : '<div class="hint">還沒有成績。</div>';
 }
 
 el('meList').addEventListener('click', function (e) {
@@ -489,6 +606,50 @@ el('meList').addEventListener('click', function (e) {
   localStorage.setItem(ME_KEY, meId);
   render(store.get());
 });
+el('btnNotMe').onclick = function () {
+  meId = ''; localStorage.removeItem(ME_KEY); render(store.get());
+};
+el('btnWtTheme').onclick = function () {
+  store.commit(function (s) { s.theme = (s.theme === 'light') ? 'dark' : 'light'; });
+};
+el('btnWtLeave').onclick = function () {
+  if (!confirmOnce('wtleave', '離開之後就查不到桌號了 —— 再按一次確定')) return;
+  meId = ''; localStorage.removeItem(ME_KEY);
+  net.leave();
+  location.hash = '';
+  location.reload();
+};
+
+/* ── 店員加入畫面 ─────────────────────────────────────── */
+function openStaffGate(on) {
+  document.body.classList.toggle('staffgate', on);
+  if (on) setTimeout(function () { el('stCode').focus(); }, 60);
+}
+el('btnStJoin').onclick = function () {
+  var code = el('stCode').value.trim().toUpperCase();
+  if (code.length < 4) { el('stMsg').innerHTML = '<span class="bad">密碼是六碼</span>'; return; }
+  el('stMsg').textContent = '連線中……';
+  net.join(code).then(function (c) {
+    if (c.role === 'watch') {
+      /* 拿到的是選手查詢碼 —— 那就給他選手畫面，不要卡在這裡 */
+      openStaffGate(false);
+      location.hash = 'join=' + code;
+      return;
+    }
+    openStaffGate(false);
+    location.hash = '';
+    goTab('tPlay');
+    toast('進來了 —— 打完一桌就點贏的那一邊');
+  }).catch(function (e) {
+    el('stMsg').innerHTML = '<span class="bad">' + esc(e.message) + '</span>';
+  });
+};
+el('stCode').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') el('btnStJoin').onclick();
+});
+el('btnStBack').onclick = function () {
+  openStaffGate(false); location.hash = '';
+};
 
 el('fServer').oninput = function () {
   var v = el('fServer').value.trim();
@@ -497,12 +658,15 @@ el('fServer').oninput = function () {
 };
 
 el('btnHost').onclick = function () {
-  if (!el('fServer').value.trim()) { toast('先填房間伺服器位址', true); return; }
-  net.host(store.get()).catch(function (e) { toast('開房失敗：' + e.message, true); });
+  net.host(store.get()).then(function () {
+    toast('開好了 —— 把店員那條網址跟密碼給店員，選手掃投影上的 QR');
+  }).catch(function (e) { toast('開房失敗：' + e.message, true); });
 };
 el('btnJoin').onclick = function () {
-  if (!el('fServer').value.trim()) { toast('先填房間伺服器位址', true); return; }
-  net.join(el('fJoin').value).then(function () {
+  var code = el('fJoin').value.trim();
+  if (!code) { toast('先輸入房號', true); return; }
+  net.join(code).then(function (c) {
+    if (c.role === 'watch') { location.hash = 'join=' + code.toUpperCase(); return; }
     goTab('tPlay');
   }).catch(function (e) { toast('加入失敗：' + e.message, true); });
 };
@@ -510,6 +674,41 @@ el('btnLeave').onclick = function () {
   if (!confirmOnce('leave', '離線之後這臺就變回單機，其他裝置看不到你的操作 —— 再按一次確定')) return;
   net.leave();
 };
+
+/* ── 網址路由 ─────────────────────────────────────────
+   #staff     店員：輸入密碼的畫面
+   #join=XXX  選手：直接進查詢畫面，什麼都不用打
+   #present   投影                                     */
+function routeHash() {
+  var h = location.hash.replace(/^#/, '');
+
+  /* 連結裡帶了伺服器位址就先套用，並記在這臺裝置上 */
+  var sm = h.match(/[&?]srv=([^&]+)/);
+  if (sm) {
+    var sv = decodeURIComponent(sm[1]);
+    net.setServer(sv);
+    try { localStorage.setItem(SRV_KEY, sv); } catch (e) {}
+    el('fServer').value = sv;
+    h = h.replace(/[&?]srv=[^&]+/, '');
+  }
+
+  var m = h.match(/^join=([A-Za-z0-9]{4,12})$/);
+  if (m) {
+    var code = m[1].toUpperCase();
+    openStaffGate(false);
+    /* 已經在同一個房間了（重整、或從主畫面點回來）就接回去，
+       不要重新 join —— 但一定要走 resume，因為身分的畫面切換
+       是掛在連線狀態上的，不呼叫就會停在控制台那一頁。 */
+    var p = (net.role === 'watch' && net.code === code) ? net.resume() : net.join(code);
+    p.catch(function (e) {
+      toast('這個查詢連結沒有用了：' + e.message, true);
+      location.hash = '';
+    });
+    return true;
+  }
+  if (h === 'staff') { openStaffGate(true); return true; }
+  return false;
+}
 
 /* ── 主題 ─────────────────────────────────────────────
    存在 state 裡而不是各自的 localStorage —— 這樣控制台切換，
@@ -631,9 +830,16 @@ function render(st) {
     ? st.event.name + (st.event.date ? '　' + st.event.date : '')
     : '尚未設定賽事';
 
+  /* 分頁不再灰掉。灰掉的按鈕只會讓人以為程式壞了 ——
+     點得下去，點進去再告訴他差什麼、按哪裡補。 */
   var has = st.matches.length > 0;
-  el('tabPlay').disabled = !has;
-  el('tabRank').disabled = !st.players.length;
+  var why = !st.players.length
+    ? '還沒有參賽名單。到設定頁把名單一次貼上，按「更新名單」。'
+    : '名單有 ' + st.players.length + ' 人了，還沒排對戰 —— 到設定頁按「開始比賽」。';
+  el('playEmpty').hidden = has;
+  el('playEmptyWhy').textContent = why;
+  el('rankEmpty').hidden = !!st.players.length;
+  el('rankEmptyWhy').textContent = '還沒有參賽名單。到設定頁把名單一次貼上，按「更新名單」。';
 
   if (!drafting) paintRoster(st.players);
   syncPlayerBox(st);
@@ -643,8 +849,8 @@ function render(st) {
 
   applyTheme(st);
   paintMatches(st);
-  paintMe(st);
   paintRank(st);
+  if (document.body.classList.contains('player')) paintWatch(st);
   if (document.body.classList.contains('present')) paintPresent(st);
 }
 
@@ -847,7 +1053,15 @@ store.subscribe(function (st) {
 });
 
 el('fServer').value = localStorage.getItem(SRV_KEY) || DEFAULT_SERVER;
-net.resume();
+
+/* 網址決定身分。有 #staff / #join= 就照網址走，
+   否則接回上次的房間（重整、關掉再開都不會掉線）。 */
+el('btnGoSetup').onclick = el('btnGoSetup2').onclick = function () { goTab('tSetup'); };
+if (!routeHash()) net.resume();
+addEventListener('hashchange', function () {
+  if (location.hash === '#present') return;
+  routeHash();
+});
 ['fFormat', 'fNaming'].forEach(function (id) { el(id).onchange = syncFormatFields; });
 ['fTables', 'fCustom'].forEach(function (id) { el(id).oninput = function () { updateTableHint(); }; });
 

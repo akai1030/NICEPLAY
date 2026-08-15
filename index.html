@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608160150">
+<link rel="stylesheet" href="src/style.css?v=202608160219">
 </head>
 <body>
 
@@ -38,8 +38,8 @@
 
 <nav class="tabs">
   <button data-tab="tSetup" class="on">設定</button>
-  <button data-tab="tPlay" id="tabPlay" disabled>對戰</button>
-  <button data-tab="tRank" id="tabRank" disabled>排名</button>
+  <button data-tab="tPlay" id="tabPlay">對戰</button>
+  <button data-tab="tRank" id="tabRank">排名</button>
 </nav>
 
 <!-- ── 設定 ─────────────────────────────────────────── -->
@@ -112,37 +112,57 @@
 
   <h2 class="sec sec-gap">Devices<em>多裝置 · 手機遙控</em></h2>
   <div class="hint" style="margin-top:0">
-    不開房也能辦完整場比賽 —— 這一區只在你要<b>用手機回報勝負</b>、
-    或<b>換一臺電腦繼續</b>時才需要。開房之後把六碼房號唸給店員，他在自己手機打開同一個網址、
-    輸入房號就進來了。
+    不開房也能辦完整場比賽 —— 這一區只在你要<b>讓店員用手機幫忙回報</b>、
+    或<b>讓選手自己查桌號</b>時才需要。按下去會產生兩條連結，貼到群組就好，
+    對方不用打任何東西。
   </div>
-  <div class="row" style="margin-top:10px">
-    <label class="fld" style="flex:2 1 260px"><span>房間伺服器位址</span>
-      <input type="text" id="fServer" placeholder="https://你的房間伺服器"></label>
+  <div class="row" id="netOff" style="margin-top:10px">
+    <button class="go" id="btnHost" style="flex:1 1 230px">開房，產生連結</button>
+    <input type="text" id="fJoin" placeholder="別人給的房號" maxlength="6"
+           style="flex:1 1 150px;text-transform:uppercase">
+    <button class="sm" id="btnJoin" style="flex:0 0 90px">加入</button>
   </div>
-  <div class="row" id="netOff">
-    <button class="sm main" id="btnHost" style="flex:1 1 150px">開房（我是主控）</button>
-    <input type="text" id="fJoin" placeholder="輸入六碼房號" maxlength="6"
-           style="flex:1 1 130px;text-transform:uppercase">
-    <button class="sm" id="btnJoin" style="flex:0 0 100px">加入</button>
-  </div>
+
   <div id="netOn" hidden>
-    <div class="codes">
-      <div class="codebox staff">
-        <span class="lab">店員房號</span>
-        <b class="roomcode" id="roomCode">——</b>
-        <span class="sub">可以回報勝負</span>
+    <div class="lk staff">
+      <span class="lab">給店員　網址 ＋ 密碼，兩個都給他</span>
+      <div class="lkrow">
+        <input type="text" id="urlStaff" readonly>
+        <button class="sm main" data-copy="urlStaff">複製網址</button>
       </div>
-      <div class="codebox view" id="viewBox">
-        <span class="lab">選手查詢碼</span>
-        <b class="roomcode" id="viewCode">——</b>
-        <span class="sub">只能看 · 唸給選手</span>
+      <div class="lkrow">
+        <input type="text" id="pwStaff" class="pw" readonly>
+        <button class="sm main" data-copy="pwStaff">複製密碼</button>
       </div>
+      <span class="sub">他打開網址、輸入密碼，就能幫忙點誰贏誰輸。密碼別給選手。</span>
     </div>
-    <div class="row" style="margin-top:10px">
-      <div class="hint" style="flex:1 1 200px;margin:0" id="roomHint"></div>
+    <div class="lk view">
+      <span class="lab">給選手　讓他們掃投影畫面上的 QR</span>
+      <div class="lkrow">
+        <button class="sm main" id="btnQR" style="flex:1 1 auto">放大 QR 給全場掃</button>
+        <button class="sm" data-copy="urlView">複製連結</button>
+      </div>
+      <input type="text" id="urlView" readonly hidden>
+      <span class="sub">投影畫面右下角也會一直有一個小的，隨時都能掃。
+        掃進去只能看自己在第幾桌、第幾名，改不了任何東西。</span>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="hint" style="flex:1 1 230px;margin:0" id="roomHint"></div>
       <button class="sm danger" id="btnLeave" style="flex:0 0 110px">離線</button>
     </div>
+    <details class="adv">
+      <summary>進階：房號與伺服器位址</summary>
+      <div class="row" style="margin-top:10px">
+        <label class="fld"><span>店員房號</span>
+          <input type="text" id="roomCode" readonly></label>
+        <label class="fld"><span>選手查詢碼</span>
+          <input type="text" id="viewCode" readonly></label>
+      </div>
+      <label class="fld"><span>房間伺服器位址</span>
+        <input type="text" id="fServer" placeholder="https://你的房間伺服器"></label>
+      <div class="hint">現場網路不通、或對方沒辦法點連結時，可以用唸的。
+        自己架伺服器才需要改位址。</div>
+    </details>
   </div>
 
   <div class="row sec-gap">
@@ -164,13 +184,10 @@
 
 <!-- ── 對戰 ─────────────────────────────────────────── -->
 <div class="pane" id="tPlay"><div class="wrap">
-  <!-- 選手查詢模式才會出現：挑自己的名字，之後就直接告訴你在第幾桌 -->
-  <div id="mePanel" hidden>
-    <div class="mebar" id="meBar" hidden></div>
-    <div class="row" id="mePick">
-      <span class="hint" style="margin:0;flex:0 0 auto">你是哪一位？</span>
-      <div class="roster" id="meList" style="flex:1 1 100%"></div>
-    </div>
+  <div class="empty" id="playEmpty" hidden>
+    <b>還沒有對戰表</b>
+    <p id="playEmptyWhy">比賽還沒開始。</p>
+    <button class="go" id="btnGoSetup">回設定頁</button>
   </div>
   <div class="prog">
     <b id="progDone">0/0</b><span id="progRound">—</span>
@@ -188,6 +205,11 @@
 
 <!-- ── 排名 ─────────────────────────────────────────── -->
 <div class="pane" id="tRank"><div class="wrap">
+  <div class="empty" id="rankEmpty" hidden>
+    <b>還沒有名次</b>
+    <p id="rankEmptyWhy">比賽還沒開始。</p>
+    <button class="go" id="btnGoSetup2">回設定頁</button>
+  </div>
   <h2 class="sec">Standings<em id="rankTitle">即時名次</em></h2>
   <div id="rankView"></div>
   <div class="row sec-gap">
@@ -201,6 +223,78 @@
   </div>
 </div></div>
 
+<!-- ── 店員加入 ─────────────────────────────────────────
+     店員拿到的是一條乾淨的網址，密碼另外給。密碼不寫在網址裡 ——
+     網址會在群組裡被轉來轉去，密碼才是真正的權限。 -->
+<div id="staff">
+  <div class="st-card">
+    <i class="mk"></i>
+    <h2>幫忙回報勝負</h2>
+    <p>跟主辦拿六碼密碼，輸入之後就能幫忙點誰贏誰輸。</p>
+    <input type="text" id="stCode" placeholder="輸入六碼密碼" maxlength="6"
+           autocomplete="off" autocapitalize="characters">
+    <button class="go big" id="btnStJoin">進去</button>
+    <div class="hint" id="stMsg"></div>
+    <button class="sm" id="btnStBack">我不是店員，回主畫面</button>
+  </div>
+</div>
+
+<!-- ── 選手查詢 ─────────────────────────────────────────
+     跟控制台完全分開的一個畫面。選手看到的東西只有三件：
+     我在第幾桌、本輪對戰、目前名次。沒有任何可以按壞的東西。 -->
+<div id="watch">
+  <header class="wt-hd">
+    <i class="mk"></i>
+    <div class="wt-evt"><b id="wtName">—</b><span id="wtRound"></span></div>
+    <button class="sm" id="btnWtTheme" title="切換淺色／深色">◐</button>
+  </header>
+
+  <div class="wt-body"><div class="wt-wrap">
+
+    <div class="wt-pick" id="wtPick">
+      <h2>你是哪一位？</h2>
+      <p>點一下自己的名字。之後每一輪，這裡都會直接寫你在第幾桌。</p>
+      <div class="roster" id="meList"></div>
+    </div>
+
+    <div class="wt-me" id="wtMe" hidden>
+      <div class="wt-top">
+        <b id="wtPlayer">—</b>
+        <button class="sm" id="btnNotMe">不是我</button>
+      </div>
+      <div class="wt-big"><span id="wtLead">你在第</span><b id="wtTable">—</b><span id="wtTail">桌</span></div>
+      <div class="wt-opp" id="wtOpp"></div>
+      <div class="wt-stat" id="wtStat"></div>
+    </div>
+
+    <div class="wt-sec">
+      <h3 id="wtMatchTitle">本輪對戰</h3>
+      <div id="wtMatches"></div>
+    </div>
+
+    <div class="wt-sec">
+      <h3>即時名次</h3>
+      <div id="wtRank"></div>
+    </div>
+
+    <div class="wt-ft">
+      <span id="wtCode"></span>
+      <button class="sm danger" id="btnWtLeave">離開查詢</button>
+    </div>
+
+  </div></div>
+</div>
+
+<!-- ── QR ───────────────────────────────────────────── -->
+<div id="qrbox">
+  <div class="qr-card">
+    <div class="qr-img" id="qrImg"></div>
+    <div class="qr-cap">選手用手機掃這個就進去了，不用打任何東西</div>
+    <div class="qr-url num" id="qrUrl"></div>
+    <button class="sm main" id="btnQRClose">關閉</button>
+  </div>
+</div>
+
 <!-- ── 投影 ─────────────────────────────────────────── -->
 <div id="present">
   <div class="pv-hd">
@@ -209,6 +303,10 @@
     <div class="pv-count num" id="pvCount"><b id="pvClock">--:--</b><i id="pvLabel">本輪剩餘</i></div>
   </div>
   <div class="pv-body" id="pvBody"></div>
+  <div class="pv-qr" id="pvQR" hidden>
+    <div class="pv-qr-img" id="pvQRImg"></div>
+    <div class="pv-qr-cap">掃我<em>查自己在第幾桌</em></div>
+  </div>
   <div class="pv-ft">
     <span class="k"><i class="mk"></i><i class="wm"></i><em>連線整合賽事次世代系統</em></span>
     <span class="grow" id="pvFoot"></span>
@@ -244,10 +342,10 @@
       <span>輸名單、按下一輪、控制投影。整場比賽只需要這一臺。</span></div>
     <div class="bk-card b"><span class="lab">Staff</span>
       <b>店員的手機（選配）</b>
-      <span>拿「店員房號」加入，可以幫忙點誰贏誰輸。</span></div>
+      <span>你給他一條網址跟一組密碼，他就能幫忙點誰贏誰輸。</span></div>
     <div class="bk-card c"><span class="lab">Player</span>
       <b>選手的手機（選配）</b>
-      <span>拿「選手查詢碼」，只能看自己在第幾桌、現在第幾名。</span></div>
+      <span>掃投影畫面上的 QR，看自己在第幾桌、第幾名。什麼都不用打。</span></div>
   </div>
 
   <div class="bk-step"><div class="no">1</div><div>
@@ -302,46 +400,50 @@
   </div></div>
 
   <div class="bk-step"><div class="no">7</div><div>
-    <h3>讓店員用手機幫忙回報（選配）</h3>
-    <p>人多的時候，一個人跑全場點很累。在設定頁最下面按 <span class="key">開房（我是主控）</span>，
-       伺服器位址<b>已經預先填好了</b>，不用打。</p>
-    <p>開完會出現兩組六碼：</p>
-    <ul>
-      <li><b>店員房號</b> —— 念給幫忙的人。他用手機開同一個網址、把房號輸進去、按「加入」，就能點勝負了。</li>
-      <li><b>選手查詢碼</b> —— 見下一項。</li>
-    </ul>
-    <div class="bk-note warn"><b>排對戰、按下一輪永遠只在主控這臺。</b>
-      手機只能回報勝負，不會不小心把設定改掉。</div>
+    <h3>開房（選配，但很值得）</h3>
+    <p>設定頁最下面按 <span class="key">開房，產生連結</span>。伺服器位址已經填好，不用打。
+       開完會給你兩樣東西 —— 一樣給店員，一樣給選手。</p>
   </div></div>
 
   <div class="bk-step"><div class="no">8</div><div>
-    <h3>讓選手自己查桌號（選配）</h3>
-    <p>把<b>選手查詢碼</b>寫在白板上，或直接放在投影畫面旁邊。</p>
-    <p>選手用手機開同一個網址、輸這組碼、點一下自己的名字，
-       畫面就直接寫<b>「你在第 3 桌」</b>、目前第幾名、對手是誰。</p>
-    <div class="bk-note"><b>這組碼只能看。</b>就算有人想動手腳，伺服器也會直接擋下來 ——
-      可以放心公開貼出來。</div>
+    <h3>給店員：一條網址 ＋ 一組密碼</h3>
+    <p>按「複製網址」貼到群組，再按「複製密碼」把六碼傳給他。
+       他打開網址會看到<b>只有一個輸入框的畫面</b>，密碼輸進去就能幫忙點誰贏誰輸了。</p>
+    <div class="bk-note warn"><b>密碼不要給選手。</b>網址在群組裡會被轉來轉去，
+      密碼才是真正的權限 —— 所以密碼不寫在網址裡。<br>
+      另外，<b>排對戰、按下一輪永遠只在你這臺</b>，店員改不到設定。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">9</div><div>
+    <h3>給選手：讓他們掃投影畫面上的 QR</h3>
+    <p>開房之後，<b>投影畫面右下角會一直有一個 QR</b>，全場隨時可以掃。
+       開場的時候可以按設定頁的 <span class="key">放大 QR 給全場掃</span>，投一個大的出來。</p>
+    <p>選手掃進去、點一下自己的名字，畫面就直接寫<b>「你在第 3 桌」</b>、
+       對手是誰、目前第幾名。之後每一輪自動更新，不用重掃。</p>
+    <div class="bk-note"><b>選手那條只能看。</b>就算有人想動手腳，伺服器也會直接擋下來 ——
+      可以放心把 QR 投在牆上。</div>
+  </div></div>
+
+  <div class="bk-step"><div class="no">10</div><div>
     <h3>出狀況的時候</h3>
     <ul>
       <li><b>排錯了、有人臨時跑掉</b> → 對戰頁按「重排這一輪」。</li>
       <li><b>有人退賽</b> → 排名頁點他旁邊的「退賽」。他打過的場次還算數，之後不再被排對。</li>
       <li><b>電腦快沒電、想換一臺</b> → 按「匯出存檔」存一個檔，新電腦按「匯入存檔」。</li>
+      <li><b>對戰／排名分頁是空的</b> → 點進去它會告訴你差什麼、按哪裡補。</li>
       <li><b>不小心重整、瀏覽器關掉</b> → 直接重新打開網址，資料還在。</li>
       <li><b>下一場比賽要重來</b> → 設定頁最下面「全部清除重來」。<b>先匯出存檔</b>再清。</li>
     </ul>
   </div></div>
 
-  <div class="bk-step"><div class="no">10</div><div>
+  <div class="bk-step"><div class="no">11</div><div>
     <h3>名次怎麼算</h3>
     <p>預設勝 3 分、平手 1 分、輸 0 分，輪空視同勝（這三個數字都可以自己改）。</p>
     <p>同分的時候，依序比 <b>OMW%</b>（你打過的對手平均勝率）→ <b>OOMW%</b>（對手的對手）→ 選手編號。
        這是實體卡牌賽的標準算法 —— <b>讓「一路碰到強手」的人排前面</b>。</p>
   </div></div>
 
-  <div class="bk-step"><div class="no">11</div><div>
+  <div class="bk-step"><div class="no">12</div><div>
     <h3>比完了</h3>
     <p>排名頁按「列印／存成 PDF」，列印視窗裡選「存成 PDF」就有一份完整名次表可以發給選手。</p>
   </div></div>
@@ -361,10 +463,11 @@
 
 <div id="toast"></div>
 
-<script src="src/engine.js?v=202608160150"></script>
-<script src="src/store.js?v=202608160150"></script>
-<script src="src/net.js?v=202608160150"></script>
-<script src="src/ui.js?v=202608160150"></script>
+<script src="src/qr.js?v=202608160219"></script>
+<script src="src/engine.js?v=202608160219"></script>
+<script src="src/store.js?v=202608160219"></script>
+<script src="src/net.js?v=202608160219"></script>
+<script src="src/ui.js?v=202608160219"></script>
 <script>
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
