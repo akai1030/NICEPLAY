@@ -1,0 +1,178 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>NICEPLAY e2e</title></head>
+<body style="margin:0;background:#111;color:#eee;font:13px/1.6 monospace">
+<iframe id="f" src="../index.html" style="width:1200px;height:840px;border:0"></iframe>
+<pre id="out">RUNNING</pre>
+<script>
+/* 端對端：把真正的介面載進 iframe，用程式去點按鈕，
+   跑完「設定 → 開始 → 每輪點勝負 → 下一輪 → 淘汰賽 → 冠軍」。 */
+(function () {
+  var L = [], fails = 0;
+  function say(s) { L.push(s); document.getElementById('out').textContent = L.join('\n'); }
+  function ok(c, m) { if (!c) { fails++; say('  ✗ ' + m); } }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  var f = document.getElementById('f');
+  function D() { return f.contentDocument; }
+  function W() { return f.contentWindow; }
+  function el(i) { return D().getElementById(i); }
+  function click(n) {
+    if (!n) { fails++; say('  ✗ 找不到要點的元素'); return; }
+    var ev = D().createEvent('MouseEvents'); ev.initEvent('click', true, true); n.dispatchEvent(ev);
+  }
+  function setVal(id, v) {
+    var n = el(id); n.value = v;
+    ['input', 'change'].forEach(function (t) {
+      var ev = D().createEvent('HTMLEvents'); ev.initEvent(t, true, true); n.dispatchEvent(ev);
+    });
+  }
+  function state() { return JSON.parse(W().localStorage.getItem('niceplay.state.v1')); }
+
+  async function run() {
+    await sleep(700);
+    W().localStorage.removeItem('niceplay.state.v1');
+    f.contentWindow.location.reload();
+    await sleep(900);
+
+    ok(!!W().Engine && !!W().Store, '程式沒載起來');
+    say('介面載入 ✓');
+
+    /* ── 設定 ─────────────────────────── */
+    var names = [];
+    for (var i = 1; i <= 16; i++) names.push(i + ' 選手' + i);
+    setVal('fName', '週三夜間賽');
+    setVal('fPlayers', names.join('\n'));
+    click(el('btnParse'));
+    await sleep(250);
+
+    var st = state();
+    ok(el('rosterView').children.length === 16, '名單沒讀進 16 位');
+    ok(el('fRounds').value === '4', '16 人應該自動建議 4 輪，實際 ' + el('fRounds').value);
+    say('讀入 16 位 · 自動建議 ' + el('fRounds').value + ' 輪 ✓');
+
+    setVal('fCut', '4');
+    setVal('fNaming', 'number');
+    setVal('fMinutes', '0');
+    click(el('btnStart'));
+    await sleep(400);
+
+    st = state();
+    ok(st.players.length === 16, '選手沒存進去');
+    ok(st.matches.length === 8, '第一輪應該 8 桌，實際 ' + st.matches.length);
+    ok(el('tPlay').classList.contains('on'), '沒有自動切到對戰分頁');
+    say('開始比賽 · 第一輪 8 桌 ✓');
+
+    /* ── 四輪瑞士制 ───────────────────── */
+    var seen = {};
+    for (var r = 1; r <= 4; r++) {
+      st = state();
+      var ms = st.matches.filter(function (m) { return m.round === r; });
+      ok(ms.length === 8, '第 ' + r + ' 輪應該 8 桌，實際 ' + ms.length);
+
+      var ppl = [];
+      ms.forEach(function (m) { ppl.push(m.a); if (m.b) ppl.push(m.b); });
+      var uniq = {}; ppl.forEach(function (x) { uniq[x] = 1; });
+      ok(Object.keys(uniq).length === 16, '第 ' + r + ' 輪有人被排兩桌');
+
+      ms.forEach(function (m) {
+        var k = [m.a, m.b].sort().join('-');
+        ok(!seen[k], '第 ' + r + ' 輪重複對手');
+        seen[k] = 1;
+      });
+      ok(ms[0].table === '1' && ms[7].table === '8', '桌號不是 1–8：' + ms[0].table + '…' + ms[7].table);
+
+      /* 在真的 UI 上點勝負 */
+      for (var i = 0; i < 8; i++) {
+        var cards = D().querySelectorAll('#matchList .mt');
+        var sides = cards[i].querySelectorAll('.sd');
+        click(sides[(i + r) % 2]);
+        await sleep(60);
+      }
+      await sleep(200);
+
+      st = state();
+      var done = st.matches.filter(function (m) { return m.round === r && m.result; }).length;
+      ok(done === 8, '第 ' + r + ' 輪只回報了 ' + done + '/8');
+      say('  第 ' + r + ' 輪：8 桌配對正確 · 無重複對手 · 8 筆勝負已回報 ✓');
+
+      click(el('btnNext'));
+      await sleep(400);
+    }
+
+    /* ── 淘汰賽（取前 4）─────────────── */
+    st = state();
+    var ko = st.matches.filter(function (m) { return typeof m.round === 'string'; });
+    ok(ko.length === 2, '四強應該 2 桌，實際 ' + ko.length);
+    ok(ko[0].round === '四強', '輪次標籤錯：' + ko[0].round);
+
+    var rows = W().Engine.standings(st.players, st.matches.filter(function (m) {
+      return typeof m.round === 'number'; }), st.config.rules);
+    var top4 = rows.slice(0, 4).map(function (x) { return x.id; }).sort().join();
+    var inKo = []; ko.forEach(function (m) { inKo.push(m.a, m.b); });
+    ok(inKo.sort().join() === top4, '四強不是前四名');
+    var rk = function (id) { return rows.filter(function (x) { return x.id === id; })[0].rank; };
+    ok(rk(ko[0].a) + 'v' + rk(ko[0].b) === '1v4' && rk(ko[1].a) + 'v' + rk(ko[1].b) === '2v3',
+       '交叉種子序錯：' + rk(ko[0].a) + 'v' + rk(ko[0].b) + ' ' + rk(ko[1].a) + 'v' + rk(ko[1].b));
+    say('  四強：1v4 / 2v3（第 1 與第 2 到決賽才碰頭）✓');
+
+    for (var q = 0; q < 2; q++) {
+      click(D().querySelectorAll('#matchList .mt')[q].querySelectorAll('.sd')[0]);
+      await sleep(80);
+    }
+    click(el('btnNext'));
+    await sleep(400);
+
+    st = state();
+    var fin = st.matches.filter(function (m) { return m.round === '決賽'; });
+    ok(fin.length === 1, '決賽應該 1 桌，實際 ' + fin.length);
+    say('  決賽 1 桌 ✓');
+
+    click(D().querySelectorAll('#matchList .mt')[0].querySelectorAll('.sd')[0]);
+    await sleep(200);
+    click(el('btnNext'));
+    await sleep(400);
+
+    st = state();
+    ok(st.phase === 'done', '打完冠軍之後 phase 應該是 done，實際 ' + st.phase);
+    var champ = st.matches.filter(function (m) { return m.round === '決賽'; })[0];
+    var cid = champ.result === 'a' ? champ.a : champ.b;
+    var cn = st.players.filter(function (p) { return p.id === cid; })[0].name;
+    say('  冠軍：' + cn + ' ✓');
+
+    /* ── 排名頁 ───────────────────────── */
+    click(D().querySelector('.tabs button[data-tab="tRank"]'));
+    await sleep(250);
+    ok(D().querySelectorAll('#rankView tbody tr').length === 16, '排名表沒有 16 列');
+    ok(D().querySelectorAll('#rankView tr.cut').length === 4, '前四名沒有標綠');
+    say('  排名表 16 列 · 前 4 名標綠 ✓');
+
+    /* ── 退賽 ─────────────────────────── */
+    var before = state().players.filter(function (p) { return p.dropped; }).length;
+    click(D().querySelectorAll('#rankView .dropb')[15]);
+    await sleep(200);
+    ok(state().players.filter(function (p) { return p.dropped; }).length === before + 1, '退賽沒生效');
+    say('  退賽切換正常 ✓');
+
+    /* ── 投影模式 ─────────────────────── */
+    click(el('btnPresent'));
+    await sleep(300);
+    ok(D().body.classList.contains('present'), '沒有進入投影模式');
+    ok(el('pvBody').children.length > 0, '投影畫面是空的');
+    say('  投影模式可開啟且有內容 ✓');
+
+    /* ── 重整之後資料還在 ─────────────── */
+    var revBefore = state().rev;
+    f.contentWindow.location.reload();
+    await sleep(900);
+    ok(state().rev === revBefore, '重整後 rev 變了');
+    ok(state().matches.length > 0, '重整後資料掉了');
+    say('  關掉重開資料還在（localStorage）✓');
+
+    say('');
+    say(fails === 0 ? '端對端全部通過 ✅' : '有 ' + fails + ' 項失敗 ❌');
+    say('DONE');
+  }
+  run().catch(function (e) { say('EXCEPTION ' + e.message + '\n' + e.stack); say('DONE'); });
+})();
+</script>
+</body></html>

@@ -1,0 +1,5 @@
+.DS_Store
+node_modules/
+*.log
+# 賽事存檔可能含選手姓名，不要進版控
+*.niceplay.json

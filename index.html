@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>NICEPLAY · 連線整合賽事次世代系統</title>
+<meta name="description" content="開源的離線賽事系統。瑞士制、單敗淘汰、循環賽，一臺筆電就能辦一場比賽。">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%23000'/><text x='32' y='45' font-size='40' font-family='serif' fill='%23B0D000' text-anchor='middle'>N</text></svg>">
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">NICEPLAY<span> ／ 賽事台</span></div>
+  <div class="evt" id="evtLabel">尚未設定賽事</div>
+  <div class="clock num" id="wallClock">--:--</div>
+  <button class="sm main" id="btnPresent">放大投影</button>
+</header>
+
+<nav class="tabs">
+  <button data-tab="tSetup" class="on">設定</button>
+  <button data-tab="tPlay" id="tabPlay" disabled>對戰</button>
+  <button data-tab="tRank" id="tabRank" disabled>排名</button>
+</nav>
+
+<!-- ── 設定 ─────────────────────────────────────────── -->
+<div class="pane on" id="tSetup"><div class="wrap">
+
+  <h2 class="sec">Event<em>賽事資訊</em></h2>
+  <div class="row">
+    <label class="fld" style="flex:2 1 240px"><span>賽事名稱</span>
+      <input type="text" id="fName" placeholder="例：週三夜間賽"></label>
+    <label class="fld"><span>日期</span>
+      <input type="text" id="fDate" placeholder="2026-08-15"></label>
+  </div>
+
+  <h2 class="sec sec-gap">Players<em>參賽名單</em></h2>
+  <textarea id="fPlayers" placeholder="一行一位選手，前面可以有編號也可以沒有：&#10;1 王小明&#10;2 陳小美&#10;林阿明"></textarea>
+  <div class="row" style="margin-top:8px">
+    <button class="sm" id="btnParse">讀入名單</button>
+    <span class="hint" id="playerMsg" style="margin:0"></span>
+  </div>
+  <div class="roster" id="rosterView" style="margin-top:10px"></div>
+
+  <h2 class="sec sec-gap">Format<em>賽制</em></h2>
+  <div class="row">
+    <label class="fld"><span>賽制</span>
+      <select id="fFormat">
+        <option value="swiss">瑞士制（同分打同分，不重複對手）</option>
+        <option value="roundrobin">循環賽（每個人都打過一次）</option>
+        <option value="single">單敗淘汰（輸一場就結束）</option>
+      </select></label>
+    <label class="fld" id="wrapRounds"><span>輪數</span>
+      <input type="number" id="fRounds" min="1" max="20"></label>
+    <label class="fld" id="wrapCut"><span>取前幾名打淘汰賽</span>
+      <select id="fCut">
+        <option value="0">不打，瑞士制到底</option>
+        <option value="4">前 4 名</option>
+        <option value="8">前 8 名</option>
+        <option value="16">前 16 名</option>
+      </select></label>
+  </div>
+
+  <h2 class="sec sec-gap">Tables<em>桌次</em></h2>
+  <div class="row">
+    <label class="fld"><span>桌號命名</span>
+      <select id="fNaming">
+        <option value="number">數字 1 2 3</option>
+        <option value="letter">字母 A B C</option>
+        <option value="custom">自訂</option>
+      </select></label>
+    <label class="fld"><span>桌數（留白＝依人數自動）</span>
+      <input type="number" id="fTables" min="1" max="256" placeholder="自動"></label>
+    <label class="fld"><span>主桌／直播桌</span>
+      <input type="text" id="fLive" placeholder="留白＝沒有"></label>
+  </div>
+  <label class="fld" id="wrapCustom" style="display:none;margin-bottom:12px"><span>自訂桌號（逗號分隔）</span>
+    <input type="text" id="fCustom" placeholder="Q1, Q2, Q3, Q4"></label>
+  <div class="hint" id="tableHint"></div>
+
+  <h2 class="sec sec-gap">Scoring<em>計分與時間</em></h2>
+  <div class="row">
+    <label class="fld"><span>勝</span><input type="number" id="fWin" min="0" max="10"></label>
+    <label class="fld"><span>平手</span><input type="number" id="fDraw" min="0" max="10"></label>
+    <label class="fld"><span>敗</span><input type="number" id="fLoss" min="0" max="10"></label>
+    <label class="fld"><span>每輪分鐘（0＝不計時）</span><input type="number" id="fMinutes" min="0" max="240"></label>
+  </div>
+
+  <div class="row sec-gap">
+    <button class="go big" id="btnStart" style="flex:1 1 240px">開始比賽</button>
+    <button class="sm" id="btnExport">匯出存檔</button>
+    <button class="sm" id="btnImport">匯入存檔</button>
+    <input type="file" id="fileImport" accept="application/json" hidden>
+  </div>
+
+  <div class="danger-zone">
+    <div class="hint" style="margin:0 0 10px">
+      <b>全部清除重來</b>　會刪掉名單、所有配對與勝負，回到空白狀態。
+      建議先按「匯出存檔」留一份。
+    </div>
+    <button class="danger" id="btnReset" style="width:100%">全部清除重來</button>
+  </div>
+
+</div></div>
+
+<!-- ── 對戰 ─────────────────────────────────────────── -->
+<div class="pane" id="tPlay"><div class="wrap">
+  <div class="prog">
+    <b id="progDone">0/0</b><span id="progRound">—</span>
+    <div class="bar"><i id="progBar" style="width:0"></i></div>
+    <span class="num" id="roundClock"></span>
+  </div>
+  <div id="matchList"></div>
+  <div class="row sec-gap">
+    <button class="main big" id="btnNext" style="flex:1 1 220px">下一輪</button>
+    <button class="sm" id="btnTimer">開始計時</button>
+    <button class="sm danger" id="btnRepair">重排這一輪</button>
+  </div>
+  <div class="hint" id="playMsg"></div>
+</div></div>
+
+<!-- ── 排名 ─────────────────────────────────────────── -->
+<div class="pane" id="tRank"><div class="wrap">
+  <h2 class="sec">Standings<em id="rankTitle">即時名次</em></h2>
+  <div id="rankView"></div>
+  <div class="row sec-gap">
+    <button class="sm" id="btnPrint">列印／存成 PDF</button>
+  </div>
+  <div class="hint">
+    積分：勝 <b id="hintWin">3</b> · 平手 <b id="hintDraw">1</b> · 敗 <b id="hintLoss">0</b> · 輪空視同勝。<br>
+    同分依序比 <b>OMW%</b>（對手勝率平均，每位對手最低以 25% 計）→
+    <b>OOMW%</b>（對手的對手勝率平均）→ 選手編號。<br>
+    點右邊的「退賽」把人排除在之後的配對外，他打過的場次仍然算數。
+  </div>
+</div></div>
+
+<!-- ── 投影 ─────────────────────────────────────────── -->
+<div id="present">
+  <div class="pv-hd">
+    <div class="pv-tag" id="pvTag">—</div>
+    <div class="pv-name"><b id="pvName">—</b><span id="pvSub"></span></div>
+    <div class="pv-count num" id="pvCount"><b id="pvClock">--:--</b><i id="pvLabel">本輪剩餘</i></div>
+  </div>
+  <div class="pv-body" id="pvBody"></div>
+  <div class="pv-ft">
+    <span class="k">NICEPLAY</span>
+    <span class="grow" id="pvFoot"></span>
+    <span class="exit">按 Esc 離開投影　·　按 1 對戰表　2 名次</span>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="src/engine.js"></script>
+<script src="src/store.js"></script>
+<script src="src/ui.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
