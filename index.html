@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608170001">
+<link rel="stylesheet" href="src/style.css?v=202608170007">
 </head>
 <body>
 
@@ -105,6 +105,7 @@
         <option value="swiss">瑞士制（同分打同分，不重複對手）</option>
         <option value="roundrobin">循環賽（每個人都打過一次）</option>
         <option value="single">單敗淘汰（輸一場就結束）</option>
+        <option value="double">雙敗淘汰（掉敗部，再輸才結束）</option>
       </select></label>
     <label class="fld" id="wrapRounds"><span>輪數</span>
       <input type="number" id="fRounds" min="1" max="20"></label>
@@ -703,11 +704,11 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608170001"></script>
-<script src="src/engine.js?v=202608170001"></script>
-<script src="src/store.js?v=202608170001"></script>
-<script src="src/net.js?v=202608170001"></script>
-<script src="src/ui.js?v=202608170001"></script>
+<script src="src/qr.js?v=202608170007"></script>
+<script src="src/engine.js?v=202608170007"></script>
+<script src="src/store.js?v=202608170007"></script>
+<script src="src/net.js?v=202608170007"></script>
+<script src="src/ui.js?v=202608170007"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -715,7 +716,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608170001').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608170007').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {

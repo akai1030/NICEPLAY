@@ -117,7 +117,11 @@ function currentRound(st) {
 function matchesOf(st, round) {
   return st.matches.filter(function (m) { return m.round === round; });
 }
-function roundLabel(r) { return typeof r === 'number' ? '第 ' + r + ' 輪' : r; }
+/* 輪次名稱。雙敗的 W1 / L4 / F 對現場沒有意義，一律翻成人話。 */
+function roundLabel(r) {
+  if (typeof r === 'number') return '第 ' + r + ' 輪';
+  return /^[WL]\d+$|^F2?$/.test(r) ? E.koName(r) : r;
+}
 
 /* 賽制寫成人話。紙本與檔名都用得到 —— 印出來貼在櫃檯的那張，
    要讓沒參加的人也看得懂這是什麼比賽。 */
@@ -125,10 +129,11 @@ function formatLabel(cfg) {
   var f = cfg.format;
   var base = f === 'roundrobin' ? '循環賽'
            : f === 'single' ? '單敗淘汰'
+           : f === 'double' ? '雙敗淘汰'
            : '瑞士制 ' + cfg.rounds + ' 輪';
   if (f === 'swiss' && cfg.cut >= 2) base += '＋前 ' + cfg.cut + ' 名淘汰賽';
   var bo = cfg.bo || 1, bk = cfg.boKO || 1;
-  if (f === 'single') return base + '　BO' + bk;
+  if (f === 'single' || f === 'double') return base + '　BO' + bk;
   if (bo === bk || !cfg.cut) return base + '　BO' + bo;
   return base + '　常規 BO' + bo + '／淘汰 BO' + bk;
 }
@@ -207,10 +212,11 @@ function syncFormatFields() {
   el('wrapCut').style.display = (f === 'swiss') ? '' : 'none';
   el('wrapCustom').style.display = (el('fNaming').value === 'custom') ? '' : 'none';
 
-  /* 純單敗淘汰沒有「常規賽」，瑞士制不接淘汰賽就沒有「淘汰賽」——
+  /* 純淘汰賽沒有「常規賽」，瑞士制不接淘汰賽就沒有「淘汰賽」——
      不相關的那個直接收起來，免得設了半天沒作用。 */
-  var hasNormal = (f !== 'single');
-  var hasKO = (f === 'single') || (f === 'swiss' && (parseInt(el('fCut').value, 10) || 0) >= 2);
+  var isKO = (f === 'single' || f === 'double');
+  var hasNormal = !isKO;
+  var hasKO = isKO || (f === 'swiss' && (parseInt(el('fCut').value, 10) || 0) >= 2);
   el('wrapBo').style.display = hasNormal ? '' : 'none';
   el('wrapBoKO').style.display = hasKO ? '' : 'none';
   el('boHint').innerHTML = boHintText(hasNormal, hasKO);
@@ -222,6 +228,10 @@ function boHintText(hasNormal, hasKO) {
   var parts = [];
   if (hasNormal) parts.push('常規賽 ' + boWord(parseInt(el('fBo').value, 10) || 1));
   if (hasKO) parts.push('淘汰賽 ' + boWord(parseInt(el('fBoKO').value, 10) || 1));
+  if (f === 'double') {
+    parts.push('雙敗：輸一場掉敗部，敗部再輸才結束。' +
+               '總決賽如果是敗部冠軍贏，兩邊都只輸一場，會自動加賽一場');
+  }
   if (!parts.length) return '';
   return parts.join('　·　') + '<br>' +
     '對戰卡上點誰贏，就記他一局；打滿還沒有人過半就算平手（BO2 的 1-1、BO3 的 1-1-1）。' +
