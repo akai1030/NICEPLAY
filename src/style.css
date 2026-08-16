@@ -502,6 +502,10 @@ body.player #btnBook { display: none !important; }
 .wr .x { flex: 0 0 auto; font-family: var(--f-serif); font-size: 12px; color: var(--faint); }
 /* BO 制時中間那格從 VS 換成目前局數 —— 選手想知道的是還差幾局 */
 .wr .x.sc { font-family: var(--f-mono); font-size: 14px; font-weight: 700; color: var(--fg); }
+/* 我的每一輪：贏的那幾列用桃紅左邊條，輸的淡掉 —— 一眼掃得出戰績走勢 */
+.wr.won { box-shadow: inset 3px 0 0 var(--lime); }
+.wr.lost { opacity: .6; }
+.wr .s.sc { font-family: var(--f-mono); color: var(--fg); }
 .wt-opp .sc { font-family: var(--f-mono); font-size: 14px; color: var(--dim); font-weight: 700; }
 .wr .n { flex: 0 0 26px; font-family: var(--f-mono); font-size: 12px; font-weight: 700;
          text-align: right; color: var(--dim); }

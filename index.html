@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608161630">
+<link rel="stylesheet" href="src/style.css?v=202608161634">
 </head>
 <body>
 
@@ -266,6 +266,8 @@
   <div id="rankView"></div>
   <div class="row sec-gap">
     <button class="sm" id="btnPrint">列印／存成 PDF</button>
+    <button class="sm" id="btnCsvRank">名次 CSV</button>
+    <button class="sm" id="btnCsvLog">對戰紀錄 CSV</button>
   </div>
   <div class="hint">
     積分：勝 <b id="hintWin">3</b> · 平手 <b id="hintDraw">1</b> · 敗 <b id="hintLoss">0</b> · 輪空視同勝。<br>
@@ -317,6 +319,12 @@
       <div class="wt-big"><span id="wtLead">你在第</span><b id="wtTable">—</b><span id="wtTail">桌</span></div>
       <div class="wt-opp" id="wtOpp"></div>
       <div class="wt-stat" id="wtStat"></div>
+    </div>
+
+    <!-- 選手第二常問的就是「我前面打了誰、幾比幾」，在這裡直接看得到 -->
+    <div class="wt-sec" id="wtMineSec" hidden>
+      <h3>我的每一輪</h3>
+      <div id="wtMine"></div>
     </div>
 
     <div class="wt-sec">
@@ -572,11 +580,11 @@
 
 <div id="toast"></div>
 
-<script src="src/qr.js?v=202608161630"></script>
-<script src="src/engine.js?v=202608161630"></script>
-<script src="src/store.js?v=202608161630"></script>
-<script src="src/net.js?v=202608161630"></script>
-<script src="src/ui.js?v=202608161630"></script>
+<script src="src/qr.js?v=202608161634"></script>
+<script src="src/engine.js?v=202608161634"></script>
+<script src="src/store.js?v=202608161634"></script>
+<script src="src/net.js?v=202608161634"></script>
+<script src="src/ui.js?v=202608161634"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -584,7 +592,18 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608161630').catch(function () {});
+    navigator.serviceWorker.register('sw.js?v=202608161634').then(function (reg) {
+      /* 有新版下載好的時候提示一聲，但語氣要輕 ——
+         比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
+      reg.addEventListener('updatefound', function () {
+        var w = reg.installing;
+        if (!w) return;
+        w.addEventListener('statechange', function () {
+          if (w.state === 'installed' && navigator.serviceWorker.controller
+              && window.NICEPLAY_NEWVER) window.NICEPLAY_NEWVER();
+        });
+      });
+    }).catch(function () {});
   });
 }
 </script>

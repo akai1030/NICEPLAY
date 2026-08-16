@@ -15,6 +15,21 @@ var E = window.Engine, S = window.Store;
 var store = S.create();
 var el = function (id) { return document.getElementById(id); };
 
+/* 整個介面是一個 IIFE，又靠一個 250ms 的計時器在跑。
+   任何一個沒接住的例外都會讓那個計時器停掉 —— 現場看到的是「畫面凍住」，
+   而且不會有任何訊息告訴主辦發生了什麼事。
+   接住它至少讓人知道要重整，也讓下一次 tick 還跑得動。 */
+addEventListener('error', function (e) {
+  try { toast('畫面出錯了：' + (e && e.message || '未知') + ' —— 重整一次就好，資料還在', true); }
+  catch (err) {}
+});
+addEventListener('unhandledrejection', function (e) {
+  try {
+    var r = e && e.reason;
+    toast('有一個動作沒完成：' + (r && r.message || r || '未知'), true);
+  } catch (err) {}
+});
+
 var pvMode = 'matches';        /* 投影顯示：matches | rank */
 var drafting = null;           /* 名單暫存，還沒按「開始比賽」 */
 var applyingRemote = false;    /* 正在套用伺服器來的狀態，這時候不要再推回去 */
@@ -449,6 +464,65 @@ el('btnReset').onclick = function () {
   toast('已全部清除');
   goTab('tSetup');
 };
+/* ── 匯出 CSV ─────────────────────────────────────────
+   店家事後要把成績貼進 Excel、或上傳到官方系統，所以給的是
+   「打得開就能用」的檔：欄位固定、有 BOM（不然 Excel 會把中文變亂碼）、
+   換行用 CRLF（Windows 的 Excel 才不會擠成一行）。 */
+function csvCell(s) {
+  s = String(s === null || s === undefined ? '' : s);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function downloadCSV(rows, suffix) {
+  var st = store.get();
+  var name = ((st.event.name || 'niceplay') + '_' + (st.event.date || '') + '_' + suffix + '.csv')
+             .replace(/\s+/g, '_');
+  var text = rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n');
+  var blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  toast('已匯出 ' + name);
+}
+
+el('btnCsvRank').onclick = function () {
+  var st = store.get();
+  if (!st.players.length) { toast('還沒有名單', true); return; }
+  var out = [['名次', '編號', '選手', '勝', '敗', '平手', '輪空', '積分',
+              'OMW%', 'OOMW%', '狀態']];
+  E.standings(st.players, st.matches, st.config.rules).forEach(function (r) {
+    out.push([r.rank, r.no, r.name, r.w, r.l, r.d, r.byes, r.pts,
+              (r.omw * 100).toFixed(1), (r.oomw * 100).toFixed(1),
+              r.dropped ? '退賽' : '']);
+  });
+  downloadCSV(out, '名次');
+};
+
+/* 對戰紀錄：一場一列，含小局比分 —— BO3 打成 2-1 的話兩邊都看得到。 */
+el('btnCsvLog').onclick = function () {
+  var st = store.get();
+  if (!st.matches.length) { toast('還沒有對戰紀錄', true); return; }
+  var out = [['輪次', '桌號', '幾勝制', '選手A編號', '選手A', '選手B編號', '選手B',
+              '結果', 'A小局', 'B小局', '和局', '逐局']];
+  st.matches.forEach(function (m) {
+    var g = E.tallyGames(E.gamesOf(m));
+    var bye = (m.b === null || m.b === undefined);
+    var res = bye ? '輪空（視同勝）'
+            : m.result === 'a' ? nameOf(st, m.a) + ' 勝'
+            : m.result === 'b' ? nameOf(st, m.b) + ' 勝'
+            : m.result === 'draw' ? '平手' : '未回報';
+    out.push([roundLabel(m.round), m.table, 'BO' + (m.bo || 1),
+              bye ? '' : numOf(st, m.a), nameOf(st, m.a),
+              bye ? '' : numOf(st, m.b), bye ? '' : nameOf(st, m.b),
+              res, bye ? '' : g.a, bye ? '' : g.b, bye ? '' : g.draw,
+              bye ? '' : E.gamesOf(m).map(function (x) {
+                return x === 'a' ? 'A' : (x === 'b' ? 'B' : '和');
+              }).join('')]);
+  });
+  downloadCSV(out, '對戰紀錄');
+};
+
 el('btnPrint').onclick = function () {
   el('tRank').classList.add('print-me');
   setTimeout(function () { window.print(); setTimeout(function () {
@@ -669,6 +743,30 @@ function paintWatch(st) {
       ? '目前第 ' + row.rank + ' 名　' + row.w + ' 勝 ' + row.l + ' 敗' +
         (row.d ? ' ' + row.d + ' 平' : '') + '　' + row.pts + ' 分'
       : '';
+  }
+
+  /* 我的每一輪：打過誰、幾比幾。輪空也要列出來，不然選手會以為漏了一輪。 */
+  var mine = me ? st.matches.filter(function (m) { return m.a === meId || m.b === meId; }) : [];
+  el('wtMineSec').hidden = !mine.length;
+  if (mine.length) {
+    el('wtMine').innerHTML = mine.map(function (m) {
+      var bye = (m.b === null || m.b === undefined);
+      var iAmA = (m.a === meId);
+      var g = E.tallyGames(E.gamesOf(m));
+      var oppId = iAmA ? m.b : m.a;
+      var win = !bye && m.result && m.result !== 'draw' && ((m.result === 'a') === iAmA);
+      var lose = !bye && m.result && m.result !== 'draw' && !win;
+      var tag = bye ? '<span class="s">輪空 · 視同勝</span>'
+              : !m.result ? '<span class="s">進行中</span>'
+              : m.result === 'draw' ? '<span class="s">平手</span>'
+              : '<span class="s">' + (win ? '勝' : '敗') + '</span>';
+      var sc = (!bye && (m.bo || 1) > 1)
+             ? '<span class="s sc">' + (iAmA ? g.a + '-' + g.b : g.b + '-' + g.a) + '</span>' : '';
+      return '<div class="wr' + (win ? ' won' : lose ? ' lost' : '') + '">' +
+        '<span class="t">' + esc(String(roundLabel(m.round)).replace('第 ', '').replace(' 輪', '')) + '</span>' +
+        '<span class="p">' + (bye ? '—' : esc(nameOf(st, oppId))) + '</span>' + sc + tag +
+        '</div>';
+    }).join('');
   }
 
   /* 本輪對戰（唯讀） */
@@ -1208,11 +1306,28 @@ function paintPvRank(st) {
 }
 
 /* ── 每 250ms 更新時鐘（資料變動由 Store 推）──────────── */
+/* 時間到只有畫面轉紅，主辦通常正低頭處理別的事 —— 補一次明確的提示。
+   只在「跑著跑著跨過零」的那一下講一次，不要每 250ms 洗版，
+   也不要在暫停或重新排輪之後又叫一次。 */
+var wasPositive = true;
+function announceTimeUp(st, ms, has) {
+  var running = has && st.timer.running;
+  if (running && wasPositive && ms <= 0) {
+    /* 投影視窗不講 —— 那句話是講給主辦聽的，橫在投影畫面上只會擋到全場。
+       投影本來就已經把倒數轉紅了。選手畫面同理。 */
+    var isConsole = !document.body.classList.contains('present')
+                 && !document.body.classList.contains('player');
+    if (isConsole) toast('時間到 —— 等大家確認完戰績再按「下一輪」', true);
+  }
+  wasPositive = !running || ms > 0;
+}
+
 function tick() {
   var st = store.get(), d = new Date();
   el('wallClock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
 
   var ms = remainMs(st), has = st.timer.durMs > 0;
+  announceTimeUp(st, ms, has);
   var txt = has ? fmtCount(ms) : '';
   el('roundClock').textContent = has ? (st.timer.running ? txt : txt + '（暫停）') : '不計時';
   el('btnTimer').textContent = st.timer.running ? '⏸　暫停計時' : '▶　開始計時';
@@ -1239,6 +1354,12 @@ store.subscribe(function (st, remote) {
   if (booted && !remote && !applyingRemote && net.role === 'host') net.pushState(st);
   booted = true;
 });
+
+/* Service Worker 抓到新版時由 index.html 呼叫進來。
+   刻意不自動重整、也不擋畫面 —— 現場最不需要的就是比賽跑到一半被打斷。 */
+window.NICEPLAY_NEWVER = function () {
+  toast('已經下載好新版本，這一場照跑不受影響；等比賽結束再重新整理就會套用');
+};
 
 el('fServer').value = localStorage.getItem(SRV_KEY) || DEFAULT_SERVER;
 
