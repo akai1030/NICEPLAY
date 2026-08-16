@@ -462,6 +462,9 @@ body.player #btnBook { display: none !important; }
             overflow: hidden; text-overflow: ellipsis; }
 .wt-evt span { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .14em;
                color: var(--label-fg); }
+.wt-evt .wt-host { font-family: var(--f-cn); font-size: 12px; letter-spacing: .02em;
+                   color: var(--faint); white-space: nowrap;
+                   overflow: hidden; text-overflow: ellipsis; }
 .wt-body { flex: 1 1 auto; overflow-y: auto; padding: 16px 14px 28px;
            -webkit-overflow-scrolling: touch; }
 .wt-wrap { max-width: 560px; margin: 0 auto; }
@@ -581,6 +584,9 @@ body.present #present { display: flex; }
 .pv-name { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
 .pv-name b { font-size: 3.4vw; font-weight: 900; line-height: 1.06; }
 .pv-name span { font-size: 1.3vw; color: var(--dim); margin-top: .4vw; }
+/* 主辦單位比輪次再低一階：它是背景資訊，不是現在要看的東西 */
+.pv-name .pv-host { font-family: var(--f-cn); font-size: 1.05vw;
+                    color: var(--faint); margin-top: .25vw; letter-spacing: .04em; }
 .pv-count { flex: 0 0 auto; display: flex; flex-direction: column;
             align-items: flex-end; justify-content: center; min-width: 12vw; }
 .pv-count b { font-family: var(--f-mono); font-size: 8.4vw; font-weight: 700;
@@ -871,8 +877,47 @@ body.present #btnBook { display: none; }
 }
 
 /* ── 列印：名次表直接印或存 PDF ───────────────────────── */
+/* ── 工具列（搜尋／排序／印桌卡）───────────────────── */
+.tools { align-items: flex-end; gap: 10px; }
+.find { flex: 1 1 200px; min-width: 0; }
+.sortfld { flex: 0 1 260px; }
+.findmsg { flex: 1 1 100%; margin: 0; }
+
+/* ── 桌卡 ─────────────────────────────────────────────
+   螢幕上永遠不存在，只有按下「列印桌卡」的那一次會出現在紙上。
+   一張 A4 直式放兩張，中間對折立起來，兩邊的人都看得到桌號。 */
+#tents { display: none; }
+/* 高度用 mm 不用 vh —— 列印時 vh 對應到什麼，各家瀏覽器講法不一致。
+   A4 直式 297mm 扣掉頁邊，兩張各 132mm 剛好。 */
+.tent { height: 132mm; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 10pt;
+        page-break-inside: avoid; break-inside: avoid;
+        border-bottom: 1pt dashed #bbb; padding: 12pt; text-align: center; }
+.tent-hd { font-size: 10pt; color: #555; letter-spacing: .08em; }
+.tent-hd b { display: block; font-size: 12pt; color: #111; margin-top: 2pt; }
+.tent-no { font-family: var(--f-serif); font-size: 96pt; font-weight: 700;
+           line-height: .9; color: #111; }
+.tent-p { font-size: 22pt; font-weight: 900; color: #111;
+          display: flex; align-items: center; gap: 8pt; }
+.tent-p i { font-style: normal; font-family: var(--f-mono); font-size: 12pt;
+            font-weight: 700; border: 1pt solid #999; border-radius: 3pt;
+            padding: 1pt 5pt; color: #444; }
+.tent-vs { font-family: var(--f-mono); font-size: 10pt; color: #666; letter-spacing: .1em; }
+
+/* 紙本抬頭：螢幕上完全不出現，只在印出來的那一張最上面。
+   那張紙會被貼在櫃檯、拍照傳到群組 —— 它得自己說明是誰辦的、
+   什麼時候、什麼賽制，不能只有一張沒頭沒尾的表格。 */
+.paper-hd { display: none; }
+
 @media print {
   html, body { background: #fff; color: #111; overflow: visible; height: auto; }
+  /* 印桌卡的時候，其他東西一律不上紙 */
+  body.print-tents #tents { display: block !important; }
+  body.print-tents .pane, body.print-tents .top, body.print-tents .tabs { display: none !important; }
+  .paper-hd { display: block; margin-bottom: 14pt;
+              border-bottom: 1.5pt solid #111; padding-bottom: 8pt; }
+  .paper-hd b { display: block; font-size: 17pt; font-weight: 900; line-height: 1.25; }
+  .paper-hd span { display: block; font-size: 9.5pt; color: #444; margin-top: 3pt; }
   .top, .tabs, .danger-zone, #toast, #present, button { display: none !important; }
   .pane { display: none !important; }
   .pane.print-me { display: block !important; overflow: visible; padding: 0; }

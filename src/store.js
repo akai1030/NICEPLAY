@@ -30,7 +30,9 @@ function uid() {
 function blank() {
   return {
     v: 1,
-    event: { name: '', date: today() },
+    /* host 是主辦單位。會出現在投影、選手手機、列印的名次表與桌卡上 ——
+       店家辦的場子，畫面上要有店名；聯合活動要看得出是誰辦的。 */
+    event: { name: '', date: today(), host: '' },
     config: {
       format: 'swiss',          /* swiss | single | roundrobin */
       rounds: 4,
@@ -44,7 +46,8 @@ function blank() {
       tableCount: 0,            /* 0 = 依人數自動 */
       customTables: [],
       rules: { win: 3, draw: 1, loss: 0, minWinPct: 0.25 },
-      liveTable: ''             /* 直播／主桌，空字串 = 沒有 */
+      liveTable: '',            /* 直播／主桌，空字串 = 沒有 */
+      sound: true               /* 時間到的提示音。主辦常常沒在看螢幕 */
     },
     players: [],
     matches: [],

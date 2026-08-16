@@ -119,6 +119,26 @@ function matchesOf(st, round) {
 }
 function roundLabel(r) { return typeof r === 'number' ? '第 ' + r + ' 輪' : r; }
 
+/* 賽制寫成人話。紙本與檔名都用得到 —— 印出來貼在櫃檯的那張，
+   要讓沒參加的人也看得懂這是什麼比賽。 */
+function formatLabel(cfg) {
+  var f = cfg.format;
+  var base = f === 'roundrobin' ? '循環賽'
+           : f === 'single' ? '單敗淘汰'
+           : '瑞士制 ' + cfg.rounds + ' 輪';
+  if (f === 'swiss' && cfg.cut >= 2) base += '＋前 ' + cfg.cut + ' 名淘汰賽';
+  var bo = cfg.bo || 1, bk = cfg.boKO || 1;
+  if (f === 'single') return base + '　BO' + bk;
+  if (bo === bk || !cfg.cut) return base + '　BO' + bo;
+  return base + '　常規 BO' + bo + '／淘汰 BO' + bk;
+}
+
+/* 檔名前綴：主辦_賽事_日期。存成一整個資料夾之後才分得出哪張是哪場。 */
+function fileStem(st) {
+  return [st.event.host, st.event.name || 'niceplay', st.event.date]
+    .filter(Boolean).join('_').replace(/[\\/:*?"<>|\s]+/g, '_');
+}
+
 /* ── 分頁 ───────────────────────────────────────────── */
 document.querySelectorAll('.tabs button').forEach(function (b) {
   b.onclick = function () {
@@ -138,6 +158,7 @@ function goTab(id) {
 function fillForm(st) {
   el('fName').value = st.event.name;
   el('fDate').value = st.event.date;
+  el('fHost').value = st.event.host || '';        /* 舊存檔沒有這一欄 */
   el('fFormat').value = st.config.format;
   el('fRounds').value = st.config.rounds;
   el('fCut').value = String(st.config.cut || 0);
@@ -152,12 +173,14 @@ function fillForm(st) {
   el('fDraw').value = st.config.rules.draw;
   el('fLoss').value = st.config.rules.loss;
   el('fMinutes').value = st.config.minutes;
+  el('fSound').value = (st.config.sound === false) ? '0' : '1';
   syncFormatFields();
 }
 
 function readForm(st) {
   st.event.name = el('fName').value.trim();
   st.event.date = el('fDate').value.trim();
+  st.event.host = el('fHost').value.trim();
   st.config.format = el('fFormat').value;
   st.config.rounds = Math.max(1, parseInt(el('fRounds').value, 10) || 1);
   st.config.cut = parseInt(el('fCut').value, 10) || 0;
@@ -172,6 +195,7 @@ function readForm(st) {
   st.config.rules.draw = parseInt(el('fDraw').value, 10);
   st.config.rules.loss = parseInt(el('fLoss').value, 10);
   st.config.minutes = Math.max(0, parseInt(el('fMinutes').value, 10) || 0);
+  st.config.sound = el('fSound').value !== '0';
 }
 
 /* 賽制不同，該問的東西也不同 —— 不相關的欄位直接收起來 */
@@ -508,7 +532,7 @@ el('rankView').addEventListener('click', function (e) {
 /* ── 匯出 / 匯入 / 清除 ─────────────────────────────── */
 el('btnExport').onclick = function () {
   var st = store.get();
-  var name = (st.event.name || 'niceplay') + '_' + (st.event.date || '') + '.json';
+  var name = fileStem(st) + '.json';
   var blob = new Blob([S.toJSON(st)], { type: 'application/json' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -557,8 +581,7 @@ function csvCell(s) {
 }
 function downloadCSV(rows, suffix) {
   var st = store.get();
-  var name = ((st.event.name || 'niceplay') + '_' + (st.event.date || '') + '_' + suffix + '.csv')
-             .replace(/\s+/g, '_');
+  var name = fileStem(st) + '_' + suffix + '.csv';
   var text = rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n');
   var blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
   var a = document.createElement('a');
@@ -604,6 +627,37 @@ el('btnCsvLog').onclick = function () {
               }).join('')]);
   });
   downloadCSV(out, '對戰紀錄');
+};
+
+/* ── 桌卡 ─────────────────────────────────────────────
+   一張 A4 印兩張，中間對折就能立在桌上，兩面都看得到桌號。
+   現場最花時間的一段是「唸桌號、大家找位子」—— 桌卡擺好，
+   選手自己就會走到定位。 */
+el('btnTents').onclick = function () {
+  var st = store.get(), r = currentRound(st);
+  if (r === null) { toast('還沒排對戰，沒有桌卡可以印', true); return; }
+  var ms = matchesOf(st, r).filter(function (m) { return m.b !== null && m.b !== undefined; })
+                           .sort(byTableName);
+  if (!ms.length) { toast('這一輪沒有要坐桌的場次', true); return; }
+
+  var head = [st.event.host, st.event.name].filter(Boolean).join('　·　');
+  el('tents').innerHTML = ms.map(function (m) {
+    var bo = m.bo || 1;
+    return '<div class="tent">' +
+      '<div class="tent-hd">' + esc(head) + '<b>' + esc(roundLabel(m.round)) + '</b></div>' +
+      '<div class="tent-no">' + esc(m.table) + '</div>' +
+      '<div class="tent-p"><i>' + numOf(st, m.a) + '</i>' + esc(nameOf(st, m.a)) + '</div>' +
+      '<div class="tent-vs">VS' + (bo > 1 ? '　·　BO' + bo + '　先贏 ' + E.winsNeeded(bo) + ' 局' : '') + '</div>' +
+      '<div class="tent-p"><i>' + numOf(st, m.b) + '</i>' + esc(nameOf(st, m.b)) + '</div>' +
+      '</div>';
+  }).join('');
+
+  document.body.classList.add('print-tents');
+  setTimeout(function () {
+    window.print();
+    setTimeout(function () { document.body.classList.remove('print-tents'); }, 500);
+  }, 60);
+  toast('共 ' + ms.length + ' 張桌卡，一張 A4 印兩張');
 };
 
 el('btnPrint').onclick = function () {
@@ -1125,9 +1179,24 @@ if (location.hash === '#present') {
 
 /* ── 畫面 ───────────────────────────────────────────── */
 function render(st) {
+  var host = (st.event.host || '').trim();
   el('evtLabel').textContent = st.event.name
-    ? st.event.name + (st.event.date ? '　' + st.event.date : '')
+    ? [host, st.event.name, st.event.date].filter(Boolean).join('　')
     : '尚未設定賽事';
+
+  /* 主辦單位在四個地方各露一次臉：投影、選手手機、紙本、檔名。
+     留白就整個不顯示 —— 空的標籤比沒有標籤更難看。 */
+  el('pvHost').hidden = !host;
+  el('pvHost').textContent = host ? '主辦　' + host : '';
+  el('wtHost').hidden = !host;
+  el('wtHost').textContent = host;
+  el('paperName').textContent = st.event.name || 'NICEPLAY 賽事';
+  el('paperMeta').textContent = [
+    host ? '主辦　' + host : '',
+    st.event.date,
+    st.players.length ? st.players.length + ' 人' : '',
+    formatLabel(st.config)
+  ].filter(Boolean).join('　·　');
 
   /* 分頁不再灰掉。灰掉的按鈕只會讓人以為程式壞了 ——
      點得下去，點進去再告訴他差什麼、按哪裡補。 */
@@ -1166,6 +1235,33 @@ function render(st) {
   if (document.body.classList.contains('present')) paintPresent(st);
 }
 
+/* ── 排序與搜尋 ───────────────────────────────────────
+   兩種排序是兩種不同的工作節奏，不是誰比較好：
+     依名次　排出來就是這樣，第一桌是分數最高的兩位，適合唸桌號
+     依桌號　回報時是拿著紙條照桌號一張一張輸入，順序要對得起來
+   存在這臺裝置上而不是賽事狀態裡 —— 主控跟副控可以各用各的順序。 */
+var SORT_KEY = 'niceplay.sort';
+function sortMode() {
+  return localStorage.getItem(SORT_KEY) === 'table' ? 'table' : 'rank';
+}
+/* 桌號可能是 1、2、10，也可能是 A、B，或自訂的 Q1。
+   純數字要照數值比（不然 10 會排在 2 前面），其餘照字面。 */
+function byTableName(x, y) {
+  var a = String(x.table), b = String(y.table);
+  var na = /^\d+$/.test(a), nb = /^\d+$/.test(b);
+  if (na && nb) return parseInt(a, 10) - parseInt(b, 10);
+  if (na !== nb) return na ? -1 : 1;
+  return a.localeCompare(b, 'zh-Hant');
+}
+function norm(s) { return String(s || '').trim().toLowerCase(); }
+function matchMatches(st, m, q) {
+  if (norm(m.table).indexOf(q) >= 0) return true;
+  return [m.a, m.b].some(function (id) {
+    if (id === null || id === undefined) return false;
+    return norm(nameOf(st, id)).indexOf(q) >= 0 || String(numOf(st, id)) === q;
+  });
+}
+
 /* 對戰列表 */
 function paintMatches(st) {
   var r = currentRound(st);
@@ -1190,8 +1286,19 @@ function paintMatches(st) {
   el('btnNext').classList.toggle('ready', allIn);
   el('btnNext').textContent = allIn ? '全部回報完 · 下一輪　→' : '下一輪　→';
 
+  /* 排序與搜尋只影響「看到什麼」，不影響進度數字 ——
+     篩選之後如果連 0/8 都跟著變，那個數字就沒有意義了。 */
+  var view = ms.slice();
+  if (sortMode() === 'table') view.sort(byTableName);
+  var q = norm(el('playFind').value);
+  if (q) view = view.filter(function (m) { return matchMatches(st, m, q); });
+  el('playFindMsg').textContent = q
+    ? (view.length ? '符合的 ' + view.length + ' 桌（共 ' + ms.length + ' 桌）'
+                   : '找不到「' + el('playFind').value.trim() + '」')
+    : '';
+
   var rm = recMap(st);
-  el('matchList').innerHTML = ms.map(function (m) {
+  el('matchList').innerHTML = view.map(function (m) {
     var live = st.config.liveTable && m.table === st.config.liveTable;
     var mine = net.role === 'watch' && meId && (m.a === meId || m.b === meId);
     var bo = m.bo || 1;
@@ -1247,12 +1354,24 @@ function paintRank(st) {
   var cut = st.config.cut || 0;
   el('rankTitle').textContent = cut ? '即時名次 · 前 ' + cut + ' 名晉級' : '即時名次';
 
+  /* 搜尋只藏列，名次照原本算 —— 篩出來的那個人旁邊還是他真正的名次，
+     不會因為只剩他一列就變成第 1 名。 */
+  var q = norm(el('rankFind').value);
+  var shown = q ? rows.filter(function (r) {
+    return norm(r.name).indexOf(q) >= 0 || String(r.no) === q;
+  }) : rows;
+  if (q && !shown.length) {
+    el('rankView').innerHTML = '<div class="hint">找不到「' + esc(el('rankFind').value.trim()) +
+      '」。名單上共 ' + rows.length + ' 人。</div>';
+    return;
+  }
+
   var h = '<table class="rank"><thead><tr><th>#</th><th class="l">選手</th>' +
           '<th>戰績</th><th>積分</th><th>OMW%</th><th>OOMW%</th><th></th></tr></thead><tbody>';
   /* 前四名另外標 —— 那是有獎的名次，跟「晉級線」是兩件事，
      所以就算沒有設定晉級人數也要看得出來。 */
   var played = rows.some(function (r) { return r.played > 0; });
-  rows.forEach(function (r) {
+  shown.forEach(function (r) {
     var idx = live.indexOf(r);
     var inCut = cut && !r.dropped && idx > -1 && idx < cut;
     var podium = played && !r.dropped && idx > -1 && idx < 4;
@@ -1405,15 +1524,45 @@ function paintPvRank(st) {
 /* 時間到只有畫面轉紅，主辦通常正低頭處理別的事 —— 補一次明確的提示。
    只在「跑著跑著跨過零」的那一下講一次，不要每 250ms 洗版，
    也不要在暫停或重新排輪之後又叫一次。 */
+/* 提示音自己合成，不載音檔 —— 現場常常沒有網路，而且一個 wav 檔
+   比整包程式還大。三聲短音比一聲長音好認：長音容易被誤認成環境噪音。
+
+   瀏覽器規定要有使用者互動過才准出聲，而「按開始計時」剛好就是那個
+   互動 —— 所以時間到的時候一定播得出來，不會被擋。 */
+var audio = null;
+function beep(st) {
+  if (st && st.config && st.config.sound === false) return;
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!audio) audio = new AC();
+    if (audio.state === 'suspended') audio.resume();
+    [0, 0.26, 0.52].forEach(function (delay, i) {
+      var o = audio.createOscillator(), g = audio.createGain();
+      var t = audio.currentTime + delay;
+      o.type = 'sine';
+      o.frequency.setValueAtTime(i === 2 ? 660 : 880, t);
+      /* 兩端都做淡入淡出，不然會有「喀」的爆音 */
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+      o.connect(g); g.connect(audio.destination);
+      o.start(t); o.stop(t + 0.22);
+    });
+  } catch (e) { /* 出不了聲就算了，畫面已經轉紅了 */ }
+}
+
 var wasPositive = true;
 function announceTimeUp(st, ms, has) {
   var running = has && st.timer.running;
   if (running && wasPositive && ms <= 0) {
     /* 投影視窗不講 —— 那句話是講給主辦聽的，橫在投影畫面上只會擋到全場。
-       投影本來就已經把倒數轉紅了。選手畫面同理。 */
-    var isConsole = !document.body.classList.contains('present')
-                 && !document.body.classList.contains('player');
-    if (isConsole) toast('時間到 —— 等大家確認完戰績再按「下一輪」', true);
+       投影本來就已經把倒數轉紅了。選手畫面同理。
+       但聲音要從投影那臺出來 —— 接電視的通常就是它，全場才聽得到。 */
+    var isPresent = document.body.classList.contains('present');
+    var isPlayer = document.body.classList.contains('player');
+    if (!isPlayer) beep(st);
+    if (!isPresent && !isPlayer) toast('時間到 —— 等大家確認完戰績再按「下一輪」', true);
   }
   wasPositive = !running || ms > 0;
 }
@@ -1485,6 +1634,31 @@ addEventListener('hashchange', function () {
 /* fCut 也要進來 —— 有沒有淘汰賽決定「淘汰賽幾勝制」該不該出現 */
 ['fFormat', 'fNaming', 'fCut', 'fBo', 'fBoKO'].forEach(function (id) {
   el(id).onchange = syncFormatFields;
+});
+
+/* 賽事名稱／日期／主辦單位離開欄位就立刻寫進狀態。
+   其餘設定要等「開始比賽」才生效（中途改賽制會把已打完的搞亂），
+   但這三個純粹是抬頭文字，改了就該馬上出現在投影與選手手機上 ——
+   不然填了主辦單位卻看不到任何變化，只會以為沒存到。
+   用 change 而不是 input：一次編輯推一次，不必每個字都推伺服器。 */
+/* 搜尋與排序：只改看到的東西，不動狀態，所以直接重畫就好。
+   搜尋用 input 即時反應 —— 現場是「有人站在旁邊等」的情境。 */
+el('playFind').oninput = function () { render(store.get()); };
+el('rankFind').oninput = function () { render(store.get()); };
+el('fSort').onchange = function () {
+  try { localStorage.setItem(SORT_KEY, el('fSort').value); } catch (e) {}
+  render(store.get());
+};
+el('fSort').value = sortMode();
+
+['fName', 'fDate', 'fHost'].forEach(function (id) {
+  el(id).onchange = function () {
+    store.commit(function (s) {
+      s.event.name = el('fName').value.trim();
+      s.event.date = el('fDate').value.trim();
+      s.event.host = el('fHost').value.trim();
+    });
+  };
 });
 ['fTables', 'fCustom'].forEach(function (id) { el(id).oninput = function () { updateTableHint(); }; });
 

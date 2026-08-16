@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608161009">
+<link rel="stylesheet" href="src/style.css?v=202608162337">
 </head>
 <body>
 
@@ -54,6 +54,14 @@
       <input type="text" id="fName" placeholder="例：週三夜間賽"></label>
     <label class="fld"><span>日期</span>
       <input type="text" id="fDate" placeholder="2026-08-15"></label>
+  </div>
+  <div class="row">
+    <label class="fld"><span>主辦單位</span>
+      <input type="text" id="fHost" placeholder="例：桌遊記"></label>
+  </div>
+  <div class="hint" style="margin-top:2px">
+    填了之後會出現在<b>投影畫面、選手手機、列印的名次表與桌卡</b>上。
+    代辦或聯合場次填了才看得出是誰辦的；留白就整個不顯示。
   </div>
 
   <h2 class="sec sec-gap">Players<em>參賽名單 · 一次貼上全部，之後補在最後面</em></h2>
@@ -127,6 +135,11 @@
     <label class="fld"><span>平手</span><input type="number" id="fDraw" min="0" max="10"></label>
     <label class="fld"><span>敗</span><input type="number" id="fLoss" min="0" max="10"></label>
     <label class="fld"><span>每輪分鐘（0＝不計時）</span><input type="number" id="fMinutes" min="0" max="240"></label>
+    <label class="fld"><span>時間到提示音</span>
+      <select id="fSound">
+        <option value="1">開　三聲短音</option>
+        <option value="0">關　只有畫面轉紅</option>
+      </select></label>
   </div>
   <div class="hint">
     <b>這三個數字決定名次怎麼排。</b>每打完一場，贏的人加「勝」的分數、輸的加「敗」的、
@@ -250,6 +263,17 @@
     <div class="bar"><i id="progBar" style="width:0"></i></div>
     <span class="num" id="roundClock"></span>
   </div>
+  <!-- 找人、換排序、印桌卡。三個都是「現場當下」的需求，所以放在對戰表正上方。 -->
+  <div class="row tools" id="playTools">
+    <input type="text" id="playFind" class="find" placeholder="找選手或桌號…">
+    <label class="fld sortfld"><span>排序</span>
+      <select id="fSort">
+        <option value="rank">依名次　第一桌是分數最高的</option>
+        <option value="table">依桌號　照紙條順序輸入</option>
+      </select></label>
+    <button class="sm" id="btnTents">列印桌卡</button>
+    <span class="hint findmsg" id="playFindMsg"></span>
+  </div>
   <div id="matchList"></div>
   <!-- 現場的順序是：先開始計時，打完回報，最後才排下一輪。
        但這兩顆按錯的代價差很多 —— 計時按錯再按一次就回來，
@@ -266,12 +290,21 @@
 
 <!-- ── 排名 ─────────────────────────────────────────── -->
 <div class="pane" id="tRank"><div class="wrap">
+  <!-- 只在紙上出現。印出來的名次表會被貼在櫃檯、拍照傳到群組，
+       所以紙本要能自己說明是誰辦的、什麼時候、第幾輪。 -->
+  <div class="paper-hd" id="rankPaperHd">
+    <b id="paperName">—</b>
+    <span id="paperMeta"></span>
+  </div>
   <div class="empty" id="rankEmpty" hidden>
     <b>還沒有名次</b>
     <p id="rankEmptyWhy">比賽還沒開始。</p>
     <button class="go" id="btnGoSetup2">回設定頁</button>
   </div>
   <h2 class="sec">Standings<em id="rankTitle">即時名次</em></h2>
+  <div class="row tools">
+    <input type="text" id="rankFind" class="find" placeholder="找選手…　128 人的表不用捲">
+  </div>
   <div id="rankView"></div>
   <div class="row sec-gap">
     <button class="sm" id="btnPrint">列印／存成 PDF</button>
@@ -308,7 +341,8 @@
 <div id="watch">
   <header class="wt-hd">
     <i class="mk"></i>
-    <div class="wt-evt"><b id="wtName">—</b><span id="wtRound"></span></div>
+    <div class="wt-evt"><b id="wtName">—</b><span id="wtRound"></span>
+      <span class="wt-host" id="wtHost" hidden></span></div>
     <button class="sm" id="btnWtTheme" title="切換淺色／深色">◐</button>
   </header>
 
@@ -368,7 +402,8 @@
 <div id="present">
   <div class="pv-hd">
     <div class="pv-tag" id="pvTag">—</div>
-    <div class="pv-name"><b id="pvName">—</b><span id="pvSub"></span></div>
+    <div class="pv-name"><b id="pvName">—</b><span id="pvSub"></span>
+      <span class="pv-host" id="pvHost" hidden></span></div>
     <div class="pv-count num" id="pvCount"><b id="pvClock">--:--</b><i id="pvLabel">本輪剩餘</i></div>
   </div>
   <div class="pv-body" id="pvBody"></div>
@@ -608,13 +643,17 @@
 
 <!-- role=status 讓螢幕閱讀器唸得到提示。用 status 而不是 alert：
      alert 會打斷正在唸的內容，而這裡多半是「已複製」這種順帶告知。 -->
+<!-- 桌卡。螢幕上永遠不出現，只在按下「列印桌卡」的那一次印出來。
+     一張 A4 兩張卡，對折就能立在桌上。 -->
+<div id="tents"></div>
+
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608161009"></script>
-<script src="src/engine.js?v=202608161009"></script>
-<script src="src/store.js?v=202608161009"></script>
-<script src="src/net.js?v=202608161009"></script>
-<script src="src/ui.js?v=202608161009"></script>
+<script src="src/qr.js?v=202608162337"></script>
+<script src="src/engine.js?v=202608162337"></script>
+<script src="src/store.js?v=202608162337"></script>
+<script src="src/net.js?v=202608162337"></script>
+<script src="src/ui.js?v=202608162337"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -622,7 +661,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608161009').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608162337').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {
