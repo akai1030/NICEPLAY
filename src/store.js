@@ -30,6 +30,7 @@ function uid() {
 function blank() {
   return {
     v: 1,
+    id: uid(),                  /* 這一場的身分。多場並存時用它認人 */
     /* host 是主辦單位。會出現在投影、選手手機、列印的名次表與桌卡上 ——
        店家辦的場子，畫面上要有店名；聯合活動要看得出是誰辦的。 */
     event: { name: '', date: today(), host: '' },
@@ -170,8 +171,65 @@ function load() {
     var raw = localStorage.getItem(KEY);
     if (!raw) return null;
     var s = JSON.parse(raw);
-    return (s && s.v === 1) ? s : null;
+    if (!s || s.v !== 1) return null;
+    if (!s.id) s.id = uid();          /* 舊存檔沒有 id，補一個才進得了清單 */
+    return s;
   } catch (e) { return null; }
+}
+
+/* ── 賽事清單 ─────────────────────────────────────────
+   週末連跑兩三場的店家，原本得「匯出 → 全部清除 → 重新設定」，
+   而「全部清除」是整個介面最危險的一顆按鈕。
+
+   設計上刻意不把所有場次都塞進同一把 key：
+     KEY  永遠只放「現在這一場」—— 舊版存檔照樣讀得進來，格式沒變
+     LIB  放「其他場次」
+   切換就是兩邊對調。沒有重複存兩份，也不必動到既有的存讀路徑。 */
+var LIB = 'niceplay.library.v1';
+
+function libLoad() {
+  try {
+    var a = JSON.parse(localStorage.getItem(LIB));
+    return Array.isArray(a) ? a.filter(function (e) { return e && e.id && e.state; }) : [];
+  } catch (e) { return []; }
+}
+function libWrite(list) {
+  try { localStorage.setItem(LIB, JSON.stringify(list)); return true; }
+  catch (e) { return false; }        /* 空間滿了：回 false，讓上層講給人聽 */
+}
+function libEntry(state) {
+  return {
+    id: state.id, savedAt: Date.now(),
+    name: state.event.name || '', host: state.event.host || '',
+    date: state.event.date || '',
+    players: (state.players || []).length,
+    rounds: countRoundsIn(state.matches),
+    state: state
+  };
+}
+function countRoundsIn(matches) {
+  var s = {};
+  (matches || []).forEach(function (m) { if (typeof m.round === 'number') s[m.round] = 1; });
+  return Object.keys(s).length;
+}
+/* 把「現在這一場」收進清單。已經在裡面就更新，不會變成兩筆。 */
+function libStash(state) {
+  var list = libLoad().filter(function (e) { return e.id !== state.id; });
+  list.unshift(libEntry(state));
+  return libWrite(list.slice(0, 20)) ? list : null;   /* 最多留 20 場 */
+}
+function libTake(id) {
+  var list = libLoad(), hit = null;
+  var rest = list.filter(function (e) {
+    if (e.id === id) { hit = e; return false; }
+    return true;
+  });
+  if (!hit) return null;
+  libWrite(rest);
+  return hit.state;
+}
+function libDrop(id) {
+  libWrite(libLoad().filter(function (e) { return e.id !== id; }));
 }
 
 /* ── 匯出／匯入 ───────────────────────────────────────── */
@@ -219,6 +277,7 @@ return {
   KEY: KEY, blank: blank, create: create, uid: uid,
   save: save, load: load, toJSON: toJSON, fromJSON: fromJSON,
   saveUndo: saveUndo, loadUndo: loadUndo, clearUndo: clearUndo,
+  LIB: LIB, libLoad: libLoad, libStash: libStash, libTake: libTake, libDrop: libDrop,
   parsePlayers: parsePlayers
 };
 });

@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608162357">
+<link rel="stylesheet" href="src/style.css?v=202608170001">
 </head>
 <body>
 
@@ -48,7 +48,18 @@
 <div class="pane on" id="tSetup"><div class="wrap cols">
  <section class="col">
 
-  <h2 class="sec">Event<em>賽事資訊</em></h2>
+  <!-- 一天跑兩三場的店家：切換就好，不必匯出再清空。
+       「全部清除重來」是整個介面最危險的一顆按鈕，這一區就是要讓它退休。 -->
+  <h2 class="sec">Events<em>賽事清單</em></h2>
+  <div class="row">
+    <label class="fld" style="flex:2 1 260px"><span>目前這一場</span>
+      <select id="fEvent"></select></label>
+    <button class="sm go" id="btnNewEvent">新增一場</button>
+    <button class="sm danger" id="btnDelEvent">刪掉這一場</button>
+  </div>
+  <div class="hint" id="eventHint" style="margin-top:2px"></div>
+
+  <h2 class="sec sec-gap">Event<em>賽事資訊</em></h2>
   <div class="row">
     <label class="fld" style="flex:2 1 240px"><span>賽事名稱</span>
       <input type="text" id="fName" placeholder="例：週三夜間賽"></label>
@@ -692,11 +703,11 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608162357"></script>
-<script src="src/engine.js?v=202608162357"></script>
-<script src="src/store.js?v=202608162357"></script>
-<script src="src/net.js?v=202608162357"></script>
-<script src="src/ui.js?v=202608162357"></script>
+<script src="src/qr.js?v=202608170001"></script>
+<script src="src/engine.js?v=202608170001"></script>
+<script src="src/store.js?v=202608170001"></script>
+<script src="src/net.js?v=202608170001"></script>
+<script src="src/ui.js?v=202608170001"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -704,7 +715,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608162357').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608170001').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {

@@ -172,5 +172,62 @@ head('【10】舊存檔（沒有 bo / boKO）讀得進來，而且維持一勝�
   console.log('  上個月的存檔今天打開不會壞 ✓');
 }
 
+head('【11】賽事清單：收起來、拿出來、刪掉');
+{
+  global.localStorage._clear();
+  eq(S.libLoad().length, 0, '一開始清單是空的');
+
+  const a = S.blank(); a.event.name = '週三夜間賽'; a.players = S.parsePlayers('王小明\n陳小美');
+  const b = S.blank(); b.event.name = '週五團戰';
+  ok(a.id && b.id && a.id !== b.id, '每一場都要有自己的 id');
+
+  ok(S.libStash(a), '收不進清單');
+  eq(S.libLoad().length, 1, '清單應該有一場');
+  eq(S.libLoad()[0].name, '週三夜間賽', '摘要的名稱不對');
+  eq(S.libLoad()[0].players, 2, '摘要的人數不對');
+
+  /* 同一場再收一次是更新，不能變成兩筆 */
+  a.event.name = '週三夜間賽（改名）';
+  S.libStash(a);
+  eq(S.libLoad().length, 1, '同一場被收成兩筆了');
+  eq(S.libLoad()[0].name, '週三夜間賽（改名）', '再收一次應該更新摘要');
+
+  const back = S.libTake(a.id);
+  ok(back !== null, '拿不出來');
+  eq(back.event.name, '週三夜間賽（改名）', '拿出來的內容不對');
+  eq(back.players.length, 2, '名單沒有跟著回來');
+  eq(S.libLoad().length, 0, '拿出來之後清單裡不該還留著');
+
+  eq(S.libTake('不存在的id'), null, '拿不存在的場次應該回 null');
+  console.log('  收 → 更新 → 拿出來 → 清單淨空，一輪都對 ✓');
+}
+
+head('【12】刪掉一場不會動到其他場');
+{
+  global.localStorage._clear();
+  const a = S.blank(); a.event.name = 'A 場';
+  const b = S.blank(); b.event.name = 'B 場';
+  S.libStash(a); S.libStash(b);
+  eq(S.libLoad().length, 2, '應該有兩場');
+  S.libDrop(a.id);
+  const left = S.libLoad();
+  eq(left.length, 1, '刪掉一場之後應該剩一場');
+  eq(left[0].name, 'B 場', '刪錯了場次');
+  console.log('  只刪掉指定的那一場 ✓');
+}
+
+head('【13】舊存檔沒有 id 也讀得進來，而且進得了清單');
+{
+  global.localStorage._clear();
+  const old = S.blank();
+  delete old.id;                       /* 模擬多場功能之前的存檔 */
+  global.localStorage.setItem(S.KEY, JSON.stringify(old));
+  const loaded = S.load();
+  ok(loaded !== null, '舊存檔應該讀得進來');
+  ok(!!loaded.id, '應該自動補上 id，不然進不了賽事清單');
+  ok(S.libStash(loaded), '補了 id 之後應該收得進清單');
+  console.log('  沒有 id 的舊存檔會自動補一個 ✓');
+}
+
 console.log(fails ? '\n有 ' + fails + ' 項沒過 ❌' : '\n全部通過 ✅');
 process.exit(fails ? 1 : 0);

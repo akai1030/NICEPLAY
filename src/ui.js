@@ -364,6 +364,110 @@ function doStart(list) {
 el('btnStart').onclick = startEvent;
 el('btnStartHere').onclick = startEvent;
 
+/* ── 賽事清單 ─────────────────────────────────────────
+   切換＝把現在這一場收進清單、把目標那一場拿出來當現在。
+   兩邊對調，沒有重複存兩份。
+
+   開著房的時候切換，房間會跟著換成新的那一場 —— 房號不變，
+   所以副控與選手的畫面會整個換掉。那通常正是想要的（同一臺筆電
+   接著辦下一場），但要先講一聲。 */
+function eventTitle(e) {
+  var bits = [e.host, e.name || '（未命名）', e.date].filter(Boolean).join('　');
+  var tail = e.players ? '　' + e.players + ' 人' : '';
+  if (e.rounds) tail += ' · ' + e.rounds + ' 輪';
+  return bits + tail;
+}
+
+function paintEvents(st) {
+  var lib = S.libLoad();
+  var opts = ['<option value="' + esc(st.id) + '">' +
+              esc(eventTitle({ host: st.event.host, name: st.event.name, date: st.event.date,
+                               players: st.players.length,
+                               rounds: E.countRounds(st.matches) })) +
+              '　←　現在</option>'];
+  lib.forEach(function (e) {
+    opts.push('<option value="' + esc(e.id) + '">' + esc(eventTitle(e)) + '</option>');
+  });
+  /* 每次 render 都重建 <select> 會把使用者正在拉開的選單關掉 ——
+     內容真的變了才重畫。 */
+  var sig = opts.join('');
+  if (el('fEvent')._sig !== sig) {
+    el('fEvent')._sig = sig;
+    el('fEvent').innerHTML = sig;
+  }
+  el('fEvent').value = st.id;
+  el('btnDelEvent').disabled = !lib.length;   /* 只剩一場就不給刪，免得刪到空 */
+  el('eventHint').innerHTML = lib.length
+    ? '另外還有 <b>' + lib.length + '</b> 場存在這臺電腦裡。切換不會動到任何一場的成績。'
+    : '目前只有這一場。按「新增一場」會把現在這場收起來，開一個全新的。';
+}
+
+function switchEvent(id) {
+  var st = store.get();
+  if (id === st.id) return;
+
+  /* 順序很要緊：一定要先確定「現在這一場收得下」，才去把目標拿出來。
+     反過來做的話，收不下的時候目標已經被移出清單，兩邊就都沒了。 */
+  var exists = S.libLoad().some(function (e) { return e.id === id; });
+  if (!exists) { toast('找不到那一場，可能已經被刪掉了', true); paintEvents(st); return; }
+
+  var mine = JSON.parse(JSON.stringify(st));
+  if (!S.libStash(mine)) {
+    toast('瀏覽器空間滿了，收不下現在這一場 —— 請先匯出存檔或刪掉幾場舊的', true);
+    paintEvents(st);
+    return;
+  }
+  var next = S.libTake(id);
+  if (!next) { toast('那一場讀不出來', true); paintEvents(st); return; }
+  markUndo('切換賽事');
+  store.replace(next);
+  drafting = null;
+  fillForm._once = false;
+  fillForm(store.get());
+  toast('已切到「' + (next.event.name || '未命名') + '」');
+}
+
+el('fEvent').onchange = function () { switchEvent(el('fEvent').value); };
+
+el('btnNewEvent').onclick = function () {
+  var st = store.get();
+  ask({ title: '新增一場？',
+        body: '現在這一場會完整收進賽事清單（成績、設定都留著），然後開一個空白的新場次。隨時可以切回來。',
+        yes: '新增一場' }, function () {
+    var mine = JSON.parse(JSON.stringify(store.get()));
+    if (!S.libStash(mine)) {
+      toast('瀏覽器空間滿了 —— 請先刪掉幾場舊的，或匯出存檔', true);
+      return;
+    }
+    markUndo('新增一場');
+    var b = S.blank();
+    b.event.host = st.event.host;      /* 同一家店連著辦，主辦單位帶過去 */
+    b.config = JSON.parse(JSON.stringify(st.config));
+    store.replace(b);
+    drafting = null;
+    fillForm._once = false;
+    fillForm(store.get());
+    goTab('tSetup');
+    toast('新的一場開好了　賽制與主辦單位都照抄上一場');
+  });
+};
+
+el('btnDelEvent').onclick = function () {
+  var st = store.get();
+  var lib = S.libLoad();
+  if (!lib.length) { toast('只剩這一場，刪掉就沒有了', true); return; }
+  ask({ title: '刪掉「' + (st.event.name || '未命名') + '」？',
+        body: '這一場的名單與所有勝負都會消失，而且不在「還原上一步」的範圍內。清單裡的其他場次不受影響。',
+        yes: '刪掉' }, function () {
+    var next = S.libTake(lib[0].id);
+    store.replace(next);
+    drafting = null;
+    fillForm._once = false;
+    fillForm(store.get());
+    toast('已刪掉，現在切到「' + (next.event.name || '未命名') + '」');
+  });
+};
+
 /* ── 還原點 ───────────────────────────────────────────
    會清掉東西的動作，動手之前先存一份。兩段確認擋不住
    「我以為我按的是別顆」，而現場那一下就是整場的成績。 */
@@ -1527,6 +1631,7 @@ function render(st) {
      留著只會讓人以為「下一輪」才是開賽的按鈕。 */
   el('playProg').hidden = !has;
   el('playActs').hidden = !has;
+  paintEvents(st);
   el('rankEmpty').hidden = !!st.players.length;
   el('rankEmptyWhy').textContent = '還沒有參賽名單。到設定頁把名單一次貼上，按「更新名單」。';
 
@@ -2049,6 +2154,7 @@ function focusTable(name) {
 document.addEventListener('keydown', function (e) {
   if (!el('tPlay').classList.contains('on')) return;
   if (document.body.classList.contains('present')) return;
+  if (askOpen()) return;              /* 確認框開著的時候，鍵盤歸它 */
   var t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
