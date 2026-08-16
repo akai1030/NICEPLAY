@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608160910">
+<link rel="stylesheet" href="src/style.css?v=202608161009">
 </head>
 <body>
 
@@ -482,7 +482,7 @@
     <p>投影畫面上：<span class="key">1</span> 對戰表、<span class="key">2</span> 即時名次、
        <span class="key">F</span> 全螢幕、<span class="key">Esc</span> 離開全螢幕；點畫面也可以切。</p>
     <div class="bk-note warn"><b>Esc 只會離開全螢幕，不會關掉投影。</b>
-      要關請按頁尾的「關閉投影窗」，而且要按兩次 —— 比賽中誤按會讓全場瞬間沒畫面。</div>
+      要關請按頁尾的「關閉投影窗」，它會再問一次你才關得掉 —— 比賽中誤按會讓全場瞬間沒畫面。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">6</div><div>
@@ -545,6 +545,8 @@
       <li><b>對戰／排名分頁是空的</b> → 點進去它會告訴你差什麼、按哪裡補。</li>
       <li><b>副控說連不上</b> → 請他確認網址跟你複製的那條一樣，密碼是六碼。</li>
       <li><b>下一場比賽要重來</b> → 設定頁最下面「全部清除重來」。<b>先匯出存檔</b>再清。</li>
+      <li><b>按錯了會清掉東西的那幾顆</b> → 不會直接發生。會清東西的動作都會先跳一個框
+        告訴你代價，按「取消」就沒事；真的按下去了，設定頁還有「還原上一步」。</li>
     </ul>
   </div></div>
 
@@ -589,15 +591,30 @@
   </div></div>
 </div>
 
+<!-- 會清掉東西的動作，動手之前先問一次。
+     原本是「同一顆按兩次」，但畫面上沒有任何東西在等第二下，
+     店家看到提示只會以為沒反應 —— 所以改成明確的兩顆按鈕。
+     放在最外層：設定／對戰／排名、投影、選手查詢頁共用同一個。 -->
+<div id="ask" role="dialog" aria-modal="true" aria-labelledby="askTitle" hidden>
+  <div class="ask-box">
+    <h3 id="askTitle">要確定嗎？</h3>
+    <p id="askBody"></p>
+    <div class="ask-acts">
+      <button id="askNo">取消</button>
+      <button id="askYes">確定</button>
+    </div>
+  </div>
+</div>
+
 <!-- role=status 讓螢幕閱讀器唸得到提示。用 status 而不是 alert：
      alert 會打斷正在唸的內容，而這裡多半是「已複製」這種順帶告知。 -->
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608160910"></script>
-<script src="src/engine.js?v=202608160910"></script>
-<script src="src/store.js?v=202608160910"></script>
-<script src="src/net.js?v=202608160910"></script>
-<script src="src/ui.js?v=202608160910"></script>
+<script src="src/qr.js?v=202608161009"></script>
+<script src="src/engine.js?v=202608161009"></script>
+<script src="src/store.js?v=202608161009"></script>
+<script src="src/net.js?v=202608161009"></script>
+<script src="src/ui.js?v=202608161009"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -605,7 +622,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608160910').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608161009').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {

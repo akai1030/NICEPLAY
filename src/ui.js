@@ -288,9 +288,16 @@ function startEvent() {
   var st = store.get();
   var list = drafting || st.players;
   if (list.length < 2) { toast('至少要兩位選手', true); return; }
-  if (st.matches.length && !confirmOnce('btnStart', '已經有比賽在進行，重新開始會清掉所有配對與勝負 —— 再按一次確定')) return;
-  if (st.matches.length) markUndo('重新開始比賽');
-
+  if (st.matches.length) {
+    ask({ title: '重新開始比賽？',
+          body: '已經有比賽在進行。重新開始會清掉所有配對與勝負，名單留著，回到還沒排第一輪的狀態。',
+          yes: '重新開始' },
+        function () { markUndo('重新開始比賽'); doStart(list); });
+    return;
+  }
+  doStart(list);
+}
+function doStart(list) {
   store.commit(function (s) {
     readForm(s);
     s.players = list.map(function (p, i) {
@@ -325,25 +332,55 @@ function paintUndo() {
 el('btnUndo').onclick = function () {
   var u = S.loadUndo();
   if (!u) return;
-  if (!confirmOnce('undo', '會回到「' + u.what + '」之前的狀態，之後做的都不算 —— 再按一次確定')) return;
-  /* 還原本身也要能反悔：把現在這份存成新的還原點 */
-  var now = JSON.parse(JSON.stringify(store.get()));
-  store.replace(u.state);
-  drafting = null;
-  S.saveUndo(now, '還原');
-  paintUndo();
-  toast('已回到「' + u.what + '」之前。再按一次「還原上一步」可以回到剛才');
+  ask({ title: '還原上一步？',
+        body: '會回到「' + u.what + '」之前的狀態，那之後做的都不算。',
+        yes: '還原' }, function () {
+    /* 還原本身也要能反悔：把現在這份存成新的還原點 */
+    var now = JSON.parse(JSON.stringify(store.get()));
+    store.replace(u.state);
+    drafting = null;
+    S.saveUndo(now, '還原');
+    paintUndo();
+    toast('已回到「' + u.what + '」之前。再按一次「還原上一步」可以回到剛才');
+  });
 };
 
-/* 需要按兩次的動作，統一用這個 */
-var armed = {};
-function confirmOnce(key, msg) {
-  var now = Date.now();
-  if (armed[key] && now - armed[key] < 6000) { armed[key] = 0; return true; }
-  armed[key] = now;
-  toast(msg, true);
-  return false;
+/* 會清掉東西的動作，動手之前先問一次。
+   原本是「同一顆按兩次」—— 現場的回饋是沒有人看得懂：畫面上沒有任何
+   東西在等第二下，提示條看起來就只是「按了沒反應」。改成明確的兩顆
+   按鈕，而且確定鍵直接寫出要做什麼（「重新開始」而不是「確定」），
+   看的人不用回想剛才按到的是哪一顆。
+
+   非同步 —— 後續動作要放進 go 裡面。
+     o.title  一句話講清楚要做什麼，帶問號
+     o.body   代價。使用者真正要判斷的是這一句
+     o.yes    確定鍵上的字，用動詞
+     o.warn   true = 金色（注意但不會清掉東西），預設紅色         */
+var askGo = null;
+function ask(o, go) {
+  askGo = go;
+  el('askTitle').textContent = o.title;
+  el('askBody').textContent = o.body;
+  el('askYes').textContent = o.yes;
+  el('ask').querySelector('.ask-box').className = 'ask-box' + (o.warn ? ' warn' : '');
+  el('ask').hidden = false;
+  /* 先落在「取消」上 —— 鍵盤直接按 Enter 不應該就把東西清掉 */
+  el('askNo').focus();
 }
+function askClose() { askGo = null; el('ask').hidden = true; }
+el('askNo').onclick = askClose;
+el('ask').onclick = function (e) { if (e.target === el('ask')) askClose(); };
+el('askYes').onclick = function () {
+  var go = askGo;
+  askClose();
+  if (go) go();
+};
+function askOpen() { return !el('ask').hidden; }
+/* Esc 一律當成取消。在投影窗裡 Esc 本來是留給「離開全螢幕」的，
+   但框開著的時候它是畫面上唯一的東西，先把它收掉才合理。 */
+addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && askOpen()) { askClose(); e.stopImmediatePropagation(); }
+});
 
 /* ── 產生下一輪 ─────────────────────────────────────── */
 function makeNextRound(silent) {
@@ -383,23 +420,29 @@ function makeNextRound(silent) {
 el('btnNext').onclick = function () {
   var st = store.get();
   var r = currentRound(st);
-  if (r !== null) {
-    var open = matchesOf(st, r).filter(function (m) { return !m.result; }).length;
-    if (open && !confirmOnce('next', '還有 ' + open + ' 桌沒回報勝負，現在排下一輪會少算這些戰績 —— 再按一次確定')) return;
-  }
-  makeNextRound();
+  var open = r === null ? 0
+    : matchesOf(st, r).filter(function (m) { return !m.result; }).length;
+  if (!open) { makeNextRound(); return; }
+  /* 不是清東西，是「現在排就少算」—— 用金色，跟紅色的那幾個分開 */
+  ask({ title: '還有 ' + open + ' 桌沒回報',
+        body: '現在排下一輪，這 ' + open + ' 桌就不會有勝負，那幾位的戰績會少算。',
+        yes: '仍要排下一輪', warn: true },
+      function () { makeNextRound(); });
 };
 
 el('btnRepair').onclick = function () {
   var st = store.get();
   var r = currentRound(st);
   if (r === null) return;
-  if (!confirmOnce('repair', '重排會清掉' + roundLabel(r) + '已經回報的勝負 —— 再按一次確定')) return;
-  markUndo('重排' + roundLabel(r));
-  store.commit(function (s) {
-    s.matches = s.matches.filter(function (m) { return m.round !== r; });
+  ask({ title: '重排' + roundLabel(r) + '？',
+        body: '會清掉' + roundLabel(r) + '已經回報的勝負，重新配一次對手。之前幾輪不受影響。',
+        yes: '重排這一輪' }, function () {
+    markUndo('重排' + roundLabel(r));
+    store.commit(function (s) {
+      s.matches = s.matches.filter(function (m) { return m.round !== r; });
+    });
+    makeNextRound();
   });
-  makeNextRound();
 };
 
 /* ── 回報勝負 ───────────────────────────────────────── */
@@ -491,11 +534,14 @@ el('fileImport').onchange = function (e) {
   e.target.value = '';
 };
 el('btnReset').onclick = function () {
-  if (!confirmOnce('reset', '會刪掉名單與所有勝負，回到空白 —— 再按一次確定')) return;
-  markUndo('全部清除重來');
-  store.reset(); drafting = null;
-  toast('已全部清除');
-  goTab('tSetup');
+  ask({ title: '全部清除？',
+        body: '會刪掉名單與所有勝負，整個回到空白畫面。清完還可以按「還原上一步」救回來。',
+        yes: '全部清除' }, function () {
+    markUndo('全部清除重來');
+    store.reset(); drafting = null;
+    toast('已全部清除');
+    goTab('tSetup');
+  });
 };
 /* ── 匯出 CSV ─────────────────────────────────────────
    店家事後要把成績貼進 Excel、或上傳到官方系統，所以給的是
@@ -854,11 +900,14 @@ el('btnWtTheme').onclick = function () {
   store.commit(function (s) { s.theme = (s.theme === 'light') ? 'dark' : 'light'; });
 };
 el('btnWtLeave').onclick = function () {
-  if (!confirmOnce('wtleave', '離開之後就查不到桌號了 —— 再按一次確定')) return;
-  meId = ''; localStorage.removeItem(ME_KEY);
-  net.leave();
-  location.hash = '';
-  location.reload();
+  ask({ title: '離開查詢畫面？',
+        body: '離開之後就查不到自己的桌號了，要重新掃一次 QR 或跟主辦拿連結。',
+        yes: '離開' }, function () {
+    meId = ''; localStorage.removeItem(ME_KEY);
+    net.leave();
+    location.hash = '';
+    location.reload();
+  });
 };
 
 /* ── 副控加入畫面 ─────────────────────────────────────── */
@@ -914,9 +963,12 @@ el('btnJoin').onclick = function () {
   }).catch(function (e) { toast('加入失敗：' + e.message, true); });
 };
 el('btnLeave').onclick = function () {
-  if (!confirmOnce('leave', '離線之後這臺就變回單機，其他裝置看不到你的操作 —— 再按一次確定')) return;
-  net.leave();
-  store.commit(function (s) { s.room = null; });
+  ask({ title: '離線？',
+        body: '這臺會變回單機。副控跟選手的畫面不會再跟著你更新，成績都還在。',
+        yes: '離線', warn: true }, function () {
+    net.leave();
+    store.commit(function (s) { s.room = null; });
+  });
 };
 
 /* ── 網址路由 ─────────────────────────────────────────
@@ -1039,14 +1091,16 @@ function closePresent() {
   done();
 }
 
-/* 比賽進行中誤按會直接讓全場失去畫面，所以要按兩次 */
+/* 比賽進行中誤按會直接讓全場失去畫面，所以先問一次 */
 el('btnClosePv').onclick = function () {
-  if (!confirmOnce('closepv', '再按一次關閉投影 —— 全場就看不到畫面了')) return;
-  closePresent();
+  ask({ title: '關閉投影？',
+        body: '全場的畫面會立刻消失。成績不受影響，關掉之後還可以再開。',
+        yes: '關閉投影' }, function () { closePresent(); });
 };
 
 addEventListener('keydown', function (e) {
   if (!document.body.classList.contains('present')) return;
+  if (askOpen()) return;            /* 框開著的時候，鍵盤都歸它 */
   /* Esc 只做一件事：離開全螢幕。
      絕對不能順手把投影窗關掉 —— macOS 上退出全螢幕本來就是按 Esc，
      兩件事綁在一起等於「想縮小畫面結果整個投影不見了」。 */
