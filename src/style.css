@@ -795,6 +795,29 @@ body.present #btnBook { display: none; }
   color: transparent; }
 .bk-thanks .th span { flex: 1 1 260px; font-size: 14px; color: var(--dim); line-height: 1.85; }
 
+/* ── 再確認 ─────────────────────────────────────────────
+   會清掉東西的動作走這個。z-index 壓過投影（50）、手冊（80）
+   跟提示條（90）—— 這個框出現的時候，它就是唯一該看的東西。 */
+#ask { position: fixed; inset: 0; z-index: 95; background: rgba(0,0,0,.72);
+       display: flex; align-items: center; justify-content: center; padding: 20px; }
+#ask[hidden] { display: none; }
+.ask-box { width: 100%; max-width: 420px; background: var(--surface);
+           border: 2px solid var(--red); border-radius: var(--r);
+           padding: 20px; box-shadow: 0 18px 60px rgba(0,0,0,.5); }
+.ask-box h3 { font-size: 19px; font-weight: 900; margin-bottom: 8px; }
+.ask-box p { font-size: 15px; line-height: 1.75; color: var(--dim); }
+/* 取消排左邊、而且維持一般按鈕的樣子 —— 誤觸的成本差很多。
+   窄螢幕反過來直排：拇指構得到的下緣留給「取消」。 */
+.ask-acts { display: flex; gap: 10px; margin-top: 20px; }
+.ask-acts button { flex: 1 1 0; min-height: 52px; }
+.ask-acts #askYes { background: var(--red); border-color: var(--red);
+                    color: var(--white); font-weight: 900; }
+/* 金色是「注意，但不會清掉東西」—— 跟計時、倒數剩兩分同一套語言 */
+.ask-box.warn { border-color: var(--gold); }
+.ask-box.warn .ask-acts #askYes { background: var(--gold); border-color: var(--gold);
+                                  color: var(--black); }
+@media (max-width: 420px) { .ask-acts { flex-direction: column-reverse; } }
+
 /* ── 提示條 ─────────────────────────────────────────── */
 #toast { position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; display: none;
          background: var(--gold); color: var(--black); font-weight: 900; font-size: 15px;
