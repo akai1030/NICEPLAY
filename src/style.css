@@ -141,8 +141,8 @@ body { display: flex; flex-direction: column; }
 
 h2.sec {
   display: flex; align-items: center; gap: 10px;
-  font-family: var(--f-mono); font-size: 11px; font-weight: 400;
-  letter-spacing: .2em; text-transform: uppercase; color: var(--label-fg);
+  font-family: var(--f-mono); font-size: 12px; font-weight: 400;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--label-fg);
   margin: 0 0 12px;
 }
 h2.sec::after { content: ''; flex: 1; height: 1px; background: var(--label-line); }
@@ -155,7 +155,17 @@ h2.sec + .row, h2.sec + .grid { margin-top: 0; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .row > .grow { flex: 1 1 160px; min-width: 0; }
 label.fld { display: flex; flex-direction: column; gap: 5px; flex: 1 1 150px; min-width: 0; }
-label.fld > span { font-family: var(--f-mono); font-size: 10px; letter-spacing: .16em;
+/* 最小規範（全站遵守，改的時候不要往下破）
+     功能性文字（欄位標籤、表頭、按鈕）　≥ 12px
+     輔助說明、數字籤　　　　　　　　　　≥ 11.5px
+     點擊區　主要 48px（--tap，含 Material 48dp 與 iOS 44pt）
+             次要 44px（iOS 最低）、破壞性小按鈕 34px
+     表單元件一律 16px —— 低於 16px 的 input，iOS Safari 一聚焦就會
+     整頁放大，副控在手機上輸入密碼時畫面會突然跳掉。
+   原本欄位標籤是 10px 全大寫 mono，字距還拉到 .16em，
+   在筆電上要湊近才讀得出來 —— 「勝／平手／敗」是會改變名次的設定，
+   不該是全畫面最小的字。 */
+label.fld > span { font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em;
                    text-transform: uppercase; color: var(--faint); }
 
 input[type=text], input[type=number], select, textarea {
@@ -190,7 +200,7 @@ button.go   { background: var(--grad); border-color: transparent; color: #FFF; f
 button.main { background: var(--blue); border-color: var(--blue); color: var(--white); font-weight: 900; }
 button.warn { background: var(--gold); border-color: var(--gold); color: var(--black); font-weight: 900; }
 button.danger { border-color: var(--red); color: var(--danger-fg); }
-button.sm { min-height: 40px; font-size: 13px; padding: 0 12px; font-weight: 500; }
+button.sm { min-height: 44px; font-size: 13px; padding: 0 12px; font-weight: 500; }
 button.big { min-height: 60px; font-size: 18px; }
 
 .hint { font-size: 13px; color: var(--dim); line-height: 1.7; margin-top: 8px; }
@@ -267,7 +277,7 @@ button.big { min-height: 60px; font-size: 18px; }
 /* ── 排名表 ─────────────────────────────────────────── */
 table.rank { width: 100%; border-collapse: collapse; font-size: 15px; }
 table.rank th {
-  font-family: var(--f-mono); font-size: 10px; font-weight: 400; letter-spacing: .14em;
+  font-family: var(--f-mono); font-size: 11.5px; font-weight: 400; letter-spacing: .1em;
   text-transform: uppercase; color: var(--label-fg); text-align: right;
   padding: 7px 6px; border-bottom: 1px solid var(--label-line); white-space: nowrap;
 }
@@ -279,6 +289,10 @@ table.rank td.rk { font-weight: 900; text-align: center; width: 34px; }
 table.rank td.pt { color: var(--accent-fg); font-weight: 900; font-size: 17px; }
 table.rank tr.cut td { background: rgba(255,46,209,.09); }
 table.rank tr.cutline td { border-bottom: 2px solid var(--lime); }
+/* 前四名＝有獎的名次，跟「晉級線」是兩件事，所以沒設晉級人數也要標。
+   用金色，跟投影倒數剩兩分轉金是同一套語言。 */
+table.rank tr.top4 td.rk { color: var(--gold); font-size: 18px; }
+table.rank tr.top4 td.l { box-shadow: inset 3px 0 0 var(--gold); }
 table.rank tr.out td { opacity: .4; }
 table.rank tr.out td.l { text-decoration: line-through; }
 .nmcell { display: flex; align-items: center; gap: 7px; }
@@ -286,7 +300,7 @@ table.rank tr.out td.l { text-decoration: line-through; }
             background: var(--line-hard); padding: 2px 5px; border-radius: 3px;
             min-width: 22px; text-align: center; }
 .dropb { border: 2px solid var(--line-hard); border-radius: 7px; padding: 3px 9px;
-         font-size: 12px; color: var(--dim); background: transparent; min-height: 30px; }
+         font-size: 12px; color: var(--dim); background: transparent; min-height: 34px; }
 .dropb.on { border-color: var(--red); color: var(--danger-fg); }
 
 /* ── 連線 ───────────────────────────────────────────── */
@@ -345,6 +359,19 @@ details.adv input { font-family: var(--f-mono); }
 .empty b { display: block; font-size: 19px; font-weight: 900; margin-bottom: 8px; }
 .empty p { font-size: 14.5px; color: var(--dim); line-height: 1.8; margin-bottom: 18px; }
 .empty button { min-width: 180px; }
+.empty .roster { margin-bottom: 20px; }
+.empty .roster .nm { cursor: default; }
+.row.ctr, .roster.ctr { justify-content: center; }
+
+/* 「開始計時」與「下一輪」刻意不同色、不同寬。
+   兩顆都是藍色大按鈕的時候現場會點錯，而代價完全不對等：
+   計時按錯再按一次就回來，下一輪按錯會把還沒回報的桌次當成沒打完。 */
+.acts { gap: 14px; }
+.acts #btnTimer { flex: 0 1 230px; }
+.acts #btnNext  { flex: 1 1 260px; }
+/* 整輪都回報完，「下一輪」才升成漸層 —— 全站只有一顆漸層按鈕，
+   那顆永遠就是「現在該按的」。沒回報完就維持素藍，不誘導人往下走。 */
+.acts #btnNext.ready { background: var(--grad); border-color: transparent; color: #FFF; }
 
 /* ── 副控加入 ─────────────────────────────────────────── */
 #staff { position: fixed; inset: 0; z-index: 60; background: var(--bg);
@@ -451,17 +478,24 @@ body.player #btnBook { display: none !important; }
    投影畫面每一格都是有人要看的資訊，浮在上面一定會擋到誰。
    頁尾為此長高一點，讓 QR 有位置站。 */
 .pv-qr { flex: 0 0 auto; display: flex; align-items: center; gap: .5vw;
-         background: #FFF; border-radius: .6vw; padding: .35vw .7vw .35vw .35vw;
-         margin-left: .6vw; }
-.pv-qr-img { width: 3.6vw; height: 3.6vw; flex: 0 0 auto; }
+         background: #FFF; border: 0; border-radius: .6vw; padding: .35vw .7vw .35vw .35vw;
+         margin-left: .6vw; min-height: 0; cursor: pointer; }
+.pv-qr:hover { filter: brightness(.94); }
+.pv-qr-img { width: 3.6vw; height: 3.6vw; flex: 0 0 auto; display: block; }
 .pv-qr-img svg { width: 100%; height: 100%; display: block; }
 .pv-qr-cap { font-size: .8vw; font-weight: 900; color: #0B0D12;
-             letter-spacing: .04em; line-height: 1.25; white-space: nowrap; }
+             letter-spacing: .04em; line-height: 1.25; white-space: nowrap; text-align: left; }
+.pv-qr-cap b { display: block; font-size: .62vw; font-weight: 700; color: #2563FF; }
+/* 全螢幕時頁尾按鈕整排淡出，但 QR 是給全場掃的，不能跟著淡掉 */
+:fullscreen .pv-ft button.pv-qr { opacity: 1; }
 
 /* 副控（手機）只回報勝負，其他都不給碰 —— 避免在店裡誤觸改設定 */
 body.guest .tabs button[data-tab="tSetup"] { display: none; }
 body.guest #btnNext, body.guest #btnRepair, body.guest #btnTimer,
 body.guest #btnPresent, body.guest .dropb, body.guest .mt .dw { display: none; }
+/* 對戰空頁那顆「開始比賽」也不能給副控 —— 他按下去只會改到自己手機上的
+   狀態（推狀態是主控的權限），畫面從此跟現場對不起來，而且看不出哪裡怪。 */
+body.guest #btnStartHere, body.guest #btnGoSetup { display: none; }
 
 /* ── 危險區 ─────────────────────────────────────────── */
 .danger-zone { margin-top: 26px; padding: 14px; border: 2px dashed var(--red);
@@ -497,7 +531,11 @@ body.present #present { display: flex; }
 .pv-ft { flex: 0 0 auto; display: flex; align-items: center; gap: 1.5vw;
          padding: .6vw 2.1vw; border-top: 1px solid var(--label-line);
          font-size: 1.4vw; background: var(--bg); min-height: 4.6vw; }
-.pv-ft .k { display: flex; align-items: center; gap: .55vw; }
+/* 標準字一行、中文全稱一行。橫著排要吃掉 12vw 以上，
+   頁尾中間的回報進度就只剩下換行一途（「尚有 2 桌未回報」被折成三行）。 */
+.pv-ft .k { display: flex; flex-direction: column; align-items: flex-start;
+            gap: .25vw; flex: 0 0 auto; }
+.pv-ft .k .lk { display: flex; align-items: center; gap: .55vw; }
 .pv-ft .k .mk { width: 1.9vw; height: 1.9vw; flex: 0 0 auto;
   background: url(../assets/mark.png) center/contain no-repeat; }
 .pv-ft .k .wm { width: 5.2vw; height: 1.1vw; flex: 0 0 auto;
@@ -505,10 +543,14 @@ body.present #present { display: flex; }
 :root[data-theme="light"] .pv-ft .k .mk { background-image: url(../assets/mark-light.png); }
 :root[data-theme="light"] .pv-ft .k .wm { background-image: url(../assets/wordmark-light.png); }
 .pv-ft .k em { font-style: normal; font-family: var(--f-cn); font-size: 1.05vw;
-               letter-spacing: .02em; color: var(--dim); margin-left: .35vw;
-               font-weight: 700; }
-.pv-ft .grow { flex: 1; }
-.pv-ft .exit { font-size: .95vw; color: var(--faint); }
+               letter-spacing: .02em; color: var(--dim); font-weight: 700;
+               white-space: nowrap; }
+/* 回報進度是頁尾唯一會變動的資訊，優先給它一整行不換行的空間；
+   擠不下的時候先犧牲最右邊那排快捷鍵說明。 */
+.pv-ft .grow { flex: 1 1 auto; min-width: 0; white-space: nowrap; }
+.pv-ft .exit { font-size: .95vw; color: var(--faint);
+               flex: 0 1 auto; min-width: 0; overflow: hidden;
+               text-overflow: ellipsis; white-space: nowrap; }
 .pv-ft button { min-height: 2.4vw; font-size: .95vw; padding: 0 1vw;
                 border-width: 1px; border-radius: .5vw; margin-left: .8vw; }
 /* 全螢幕之後頁尾那排按鈕淡出，滑鼠移過去才顯示 —— 投影畫面要乾淨 */
@@ -565,6 +607,9 @@ body.present #present { display: flex; }
            font-family: var(--f-mono); font-weight: 700; }
 .pv-rk.in { border-color: var(--lime); background: rgba(255,46,209,.08); }
 .pv-rk.in b, .pv-rk.in u { color: var(--accent-fg); }
+/* 頒獎的時候投影就停在這一頁，前四名要從場地最後一排也認得出來 */
+.pv-rk.top4 { border-color: var(--gold); border-width: 2px; }
+.pv-rk.top4 b { color: var(--gold); }
 .pv-rk.out { opacity: .35; }
 .pv-rk.out span { text-decoration: line-through; }
 
@@ -667,7 +712,7 @@ body.present #btnBook { display: none; }
 .bk-who { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 24px; }
 .bk-card { flex: 1 1 220px; background: var(--surface);
   border: 2px solid var(--line-hard); border-radius: var(--r); padding: 13px 15px; }
-.bk-card .lab { font-family: var(--f-mono); font-size: 10px; letter-spacing: .18em;
+.bk-card .lab { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .14em;
   text-transform: uppercase; color: var(--faint); display: block; margin-bottom: 5px; }
 .bk-card b { font-size: 15px; display: block; margin-bottom: 3px; }
 .bk-card span { font-size: 13.5px; color: var(--dim); line-height: 1.7; }
@@ -695,10 +740,44 @@ body.present #btnBook { display: none; }
 #toast.bad { background: var(--red); color: var(--white); }
 #toast.on { display: block; }
 
+/* ── 手機 ─────────────────────────────────────────────
+   這不是「順便也能看」的情境 —— 副控就是一支手機，而對戰卡是他
+   整場唯一會碰的東西。桌號＋兩位選手＋平手擠在一列，在 390px 寬的
+   螢幕上每一格只剩下九十幾 px，名字全部變成「王小…」，
+   而且三個可點區域彼此只差幾 mm，站著單手操作一定按錯。
+
+   所以窄螢幕改成：桌號固定在左邊一整條，選手與平手直向堆疊，
+   每一格都是整行寬的點擊區。 */
 @media (max-width: 560px) {
   .tabs button { font-size: 13px; min-height: 48px; }
-  .pane { padding: 12px; }
-  .mt .sd { font-size: 15px; }
+  .pane { padding: 12px 12px 78px; }
+
+  .mt { display: grid; grid-template-columns: 42px 1fr; gap: 6px; margin-bottom: 14px; }
+  .mt .tb { grid-row: 1 / span 3; align-self: stretch; height: auto; flex: none;
+            border-radius: var(--r); font-size: 22px; }
+  .mt .sd { font-size: 16px; min-height: 54px; flex: none; }
+  .mt .dw { flex: none; min-height: 42px; width: 100%; }
+  .mt .sd.bye { min-height: 42px; }
+
+  /* 兩顆主要動作各佔一整行 —— 並排時它們的邊界只差 14px */
+  .acts #btnTimer, .acts #btnNext { flex: 1 1 100%; }
+  .acts #btnRepair { flex: 1 1 100%; }
+
+  /* OMW / OOMW 在手機上讀不了也用不到，收起來留寬度給名字 */
+  table.rank th:nth-child(5), table.rank td:nth-child(5),
+  table.rank th:nth-child(6), table.rank td:nth-child(6) { display: none; }
+  table.rank { font-size: 16px; }
+
+  .prog b { font-size: 20px; }
+  #roundClock { font-size: 20px; }
+  .empty { padding: 32px 8px; }
+  .empty button { min-width: 0; width: 100%; }
+  .empty .row.ctr { flex-direction: column; }
+}
+/* 直向的窄螢幕（多數手機）連設定頁的並排欄位也放不下 */
+@media (max-width: 420px) {
+  label.fld { flex: 1 1 100%; }
+  .row > .grow { flex: 1 1 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608161531">
+<link rel="stylesheet" href="src/style.css?v=202608161609">
 </head>
 <body>
 
@@ -109,6 +109,13 @@
     <label class="fld"><span>敗</span><input type="number" id="fLoss" min="0" max="10"></label>
     <label class="fld"><span>每輪分鐘（0＝不計時）</span><input type="number" id="fMinutes" min="0" max="240"></label>
   </div>
+  <div class="hint">
+    <b>這三個數字決定名次怎麼排。</b>每打完一場，贏的人加「勝」的分數、輸的加「敗」的、
+    平手兩邊各加「平手」的，輪空視同一勝。<b>3 / 1 / 0</b> 是 MTG 與寶可夢的通用值，
+    照用就好；同分時系統再用 OMW% 分高下，不必自己調。<br>
+    <b>每輪分鐘</b>是每一輪的倒數長度，投影畫面會顯示，剩 2 分轉金、剩 30 秒轉紅。
+    填 0 就完全不計時。時間到不會自動換輪 —— 換輪永遠是你按「下一輪」。
+  </div>
 
   <h2 class="sec sec-gap">Devices<em>多裝置 · 手機遙控</em></h2>
   <div class="hint" style="margin-top:0">
@@ -195,22 +202,31 @@
 
 <!-- ── 對戰 ─────────────────────────────────────────── -->
 <div class="pane" id="tPlay"><div class="wrap">
+  <!-- 名單齊了卻還沒排對戰的時候，不要把人趕回設定頁 ——
+       缺的東西就在這裡講完、就在這裡按完。 -->
   <div class="empty" id="playEmpty" hidden>
     <b>還沒有對戰表</b>
     <p id="playEmptyWhy">比賽還沒開始。</p>
-    <button class="go" id="btnGoSetup">回設定頁</button>
+    <div class="roster ctr" id="playEmptyList"></div>
+    <div class="row ctr">
+      <button class="go big" id="btnStartHere">開始比賽</button>
+      <button class="sm" id="btnGoSetup">回設定頁改設定</button>
+    </div>
   </div>
-  <div class="prog">
+  <div class="prog" id="playProg">
     <b id="progDone">0/0</b><span id="progRound">—</span>
     <div class="bar"><i id="progBar" style="width:0"></i></div>
     <span class="num" id="roundClock"></span>
   </div>
   <div id="matchList"></div>
-  <!-- 現場的順序就是：先開始計時，打完回報，最後才排下一輪。
-       兩顆是同一個層級的動作，所以同樣大、同樣重，按照時間先後排。 -->
-  <div class="row sec-gap">
-    <button class="main big" id="btnTimer" style="flex:1 1 220px">開始計時</button>
-    <button class="main big" id="btnNext" style="flex:1 1 220px">下一輪</button>
+  <!-- 現場的順序是：先開始計時，打完回報，最後才排下一輪。
+       但這兩顆按錯的代價差很多 —— 計時按錯再按一次就回來，
+       下一輪按錯會把還沒回報的桌次當成沒打完。所以刻意長得不一樣：
+       時間相關的走金色（跟投影倒數剩兩分轉金是同一套語言），
+       推進賽程的走藍色，而且整輪回報完才升成漸層。 -->
+  <div class="row sec-gap acts" id="playActs">
+    <button class="warn big" id="btnTimer">▶　開始計時</button>
+    <button class="main big" id="btnNext">下一輪　→</button>
     <button class="sm danger" id="btnRepair">重排這一輪</button>
   </div>
   <div class="hint" id="playMsg"></div>
@@ -317,15 +333,18 @@
   </div>
   <div class="pv-body" id="pvBody"></div>
   <div class="pv-ft">
-    <span class="k"><i class="mk"></i><i class="wm"></i><em>連線整合賽事次世代系統</em></span>
+    <!-- 標準字跟中文全稱疊成兩行 —— 橫著排會把頁尾中間的回報進度擠到換行 -->
+    <span class="k"><span class="lk"><i class="mk"></i><i class="wm"></i></span>
+      <em>連線整合賽事次世代系統</em></span>
     <span class="grow" id="pvFoot"></span>
     <span class="exit">點畫面切換對戰表／名次　·　1 對戰表　2 名次　F 全螢幕　Esc 離開全螢幕</span>
     <button class="sm" id="btnFull">全螢幕</button>
     <button class="sm" id="btnClosePv">關閉投影窗</button>
-    <div class="pv-qr" id="pvQR" hidden>
-      <div class="pv-qr-img" id="pvQRImg"></div>
-      <div class="pv-qr-cap">掃我查桌號</div>
-    </div>
+    <!-- 投影上的 QR 只有一枚郵票大，坐後排的掃不到 —— 點一下放大到滿版 -->
+    <button class="pv-qr" id="pvQR" hidden title="點一下放大給全場掃">
+      <span class="pv-qr-img" id="pvQRImg"></span>
+      <span class="pv-qr-cap">掃我查桌號<b>點我放大</b></span>
+    </button>
   </div>
 </div>
 
@@ -341,7 +360,6 @@
     <button class="sm main" id="btnBookClose">關閉</button>
   </div>
 
-  <div class="bk-body" id="bookBody"><div class="wrap">
   <div class="bk-body" id="bookBody"><div class="wrap">
 
   <div class="bk-hero">
@@ -510,14 +528,15 @@
   </div>
 
   </div></div>
+</div>
 
 <div id="toast"></div>
 
-<script src="src/qr.js?v=202608161531"></script>
-<script src="src/engine.js?v=202608161531"></script>
-<script src="src/store.js?v=202608161531"></script>
-<script src="src/net.js?v=202608161531"></script>
-<script src="src/ui.js?v=202608161531"></script>
+<script src="src/qr.js?v=202608161609"></script>
+<script src="src/engine.js?v=202608161609"></script>
+<script src="src/store.js?v=202608161609"></script>
+<script src="src/net.js?v=202608161609"></script>
+<script src="src/ui.js?v=202608161609"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -525,7 +544,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608161531').catch(function () {});
+    navigator.serviceWorker.register('sw.js?v=202608161609').catch(function () {});
   });
 }
 </script>

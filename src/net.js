@@ -75,6 +75,22 @@ function create(opts) {
     status: opts.onStatus || function () {}
   };
 
+  /* 主控推出去的狀態會經 SSE 原封不動回到自己身上。內容一樣時無所謂，
+     但推送在飛的時候本機又改了一次，回音就變成「用舊的蓋掉新的」。
+
+     現場症狀：按「開始比賽」，對戰表排好又瞬間消失，只剩名單，計時器也
+     退回不計時 —— 因為那顆按鈕連做兩次 commit（先寫名單、再排對戰），
+     第一次的回音把第二次的成果洗掉，排隊中的第二次推送再把空的送上去。
+     按「下一輪」不會，因為它只 commit 一次。
+
+     伺服器是先廣播、後回應（見 server/index.js 的 /state），量過正式站
+     八次有六次回音比 POST 的回應早到，所以這不是偶發。
+
+     判斷方式：pushAgain 為真＝送出去之後本機又改過，本機一定比伺服器新，
+     這時候進來的一律不理。只看 pushing 不夠精準 —— 那會把別人在這段時間
+     做的變更也一起擋掉。 */
+  function localAhead() { return !!(conn && conn.role === 'host' && pushAgain); }
+
   function status(msg, bad) {
     on.status({ role: conn ? conn.role : 'off', code: conn ? conn.code : '',
                 online: online, msg: msg || '', bad: !!bad });
@@ -151,6 +167,7 @@ function create(opts) {
           try { j = JSON.parse(e.data); } catch (err) { return; }
           if (!j || j.rev === undefined) return;
           online = true;
+          if (localAhead()) return;                  /* 這是自己的舊回音 */
           if (j.rev <= lastRev) return;
           lastRev = j.rev;
           on.state(j.state, conn.role);
@@ -177,7 +194,7 @@ function create(opts) {
     if (!conn) return;
     api('/api/rooms/' + conn.code).then(function (j) {
       online = true;
-      if (j.rev > lastRev) { lastRev = j.rev; on.state(j.state, conn.role); }
+      if (!localAhead() && j.rev > lastRev) { lastRev = j.rev; on.state(j.state, conn.role); }
       status('');
     }).catch(function () { online = false; status('連不到伺服器', true); });
   }

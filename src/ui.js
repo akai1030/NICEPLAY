@@ -237,7 +237,9 @@ function paintRoster(list) {
 }
 
 /* ── 開始比賽 ───────────────────────────────────────── */
-el('btnStart').onclick = function () {
+/* 設定頁與對戰空頁各有一顆，走同一條路 ——
+   名單都齊了卻還沒排對戰的時候，不應該把人趕回設定頁才能開賽。 */
+function startEvent() {
   var st = store.get();
   var list = drafting || st.players;
   if (list.length < 2) { toast('至少要兩位選手', true); return; }
@@ -254,7 +256,9 @@ el('btnStart').onclick = function () {
   });
   drafting = null;
   makeNextRound(true);
-};
+}
+el('btnStart').onclick = startEvent;
+el('btnStartHere').onclick = startEvent;
 
 /* 需要按兩次的動作，統一用這個 */
 var armed = {};
@@ -539,12 +543,16 @@ function paintQRs(st) {
   drawQR('sideQR', 'sideQRImg', url, 300);      /* 設定頁「給選手」那一格 */
   if (url) el('sideQRUrl').textContent = url;
 }
-el('btnQR').onclick = function () {
+function openBigQR() {
   var url = roomViewURL(store.get()) || el('urlView').value;
   el('qrImg').innerHTML = qrSVG(url, 640);
   el('qrUrl').textContent = url;
   el('qrbox').classList.add('on');
-};
+}
+el('btnQR').onclick = openBigQR;
+/* 投影頁尾那枚 QR 只有郵票大，坐後排的掃不到 —— 點一下就放到滿版。
+   #qrbox 的 z-index 比投影層高，所以全螢幕投影時也蓋得上去。 */
+el('pvQR').onclick = openBigQR;
 el('btnQRClose').onclick = function () { el('qrbox').classList.remove('on'); };
 el('qrbox').onclick = function (e) { if (e.target === el('qrbox')) el('btnQRClose').onclick(); };
 
@@ -879,11 +887,23 @@ function render(st) {
   /* 分頁不再灰掉。灰掉的按鈕只會讓人以為程式壞了 ——
      點得下去，點進去再告訴他差什麼、按哪裡補。 */
   var has = st.matches.length > 0;
-  var why = !st.players.length
-    ? '還沒有參賽名單。到設定頁把名單一次貼上，按「更新名單」。'
-    : '名單有 ' + st.players.length + ' 人了，還沒排對戰 —— 到設定頁按「開始比賽」。';
+  var ready = st.players.length >= 2;
   el('playEmpty').hidden = has;
-  el('playEmptyWhy').textContent = why;
+  el('playEmptyWhy').textContent = !st.players.length
+    ? '還沒有參賽名單。到設定頁把名單一次貼上，按「更新名單」。'
+    : ready
+      ? '這 ' + st.players.length + ' 位都在了，確認沒問題就直接開賽 —— 系統會排好第一輪。'
+      : '只有 1 位選手，至少要兩位才排得出對戰。';
+  /* 名單就列在這裡，不用切回設定頁確認 */
+  el('playEmptyList').innerHTML = st.players.map(function (p) {
+    return '<div class="nm' + (p.dropped ? ' out' : '') + '"><i>' + p.no + '</i>' +
+           '<span>' + esc(p.name) + '</span></div>';
+  }).join('');
+  el('btnStartHere').hidden = !ready;
+  /* 還沒排對戰的時候，進度條與那排動作按鈕沒有東西可以操作 ——
+     留著只會讓人以為「下一輪」才是開賽的按鈕。 */
+  el('playProg').hidden = !has;
+  el('playActs').hidden = !has;
   el('rankEmpty').hidden = !!st.players.length;
   el('rankEmptyWhy').textContent = '還沒有參賽名單。到設定頁把名單一次貼上，按「更新名單」。';
 
@@ -918,6 +938,12 @@ function paintMatches(st) {
   el('progRound').textContent = roundLabel(r);
   el('progDone').textContent = done + '/' + playable.length;
   el('progBar').style.width = (playable.length ? 100 * done / playable.length : 0) + '%';
+
+  /* 整輪回報完之前，「下一輪」維持素藍、不誘導人往下走；
+     回報完才升成漸層。全站同時只有一顆漸層按鈕，那顆就是現在該按的。 */
+  var allIn = playable.length > 0 && done === playable.length;
+  el('btnNext').classList.toggle('ready', allIn);
+  el('btnNext').textContent = allIn ? '全部回報完 · 下一輪　→' : '下一輪　→';
 
   var rm = recMap(st);
   el('matchList').innerHTML = ms.map(function (m) {
@@ -958,11 +984,15 @@ function paintRank(st) {
 
   var h = '<table class="rank"><thead><tr><th>#</th><th class="l">選手</th>' +
           '<th>戰績</th><th>積分</th><th>OMW%</th><th>OOMW%</th><th></th></tr></thead><tbody>';
+  /* 前四名另外標 —— 那是有獎的名次，跟「晉級線」是兩件事，
+     所以就算沒有設定晉級人數也要看得出來。 */
+  var played = rows.some(function (r) { return r.played > 0; });
   rows.forEach(function (r) {
     var idx = live.indexOf(r);
     var inCut = cut && !r.dropped && idx > -1 && idx < cut;
+    var podium = played && !r.dropped && idx > -1 && idx < 4;
     h += '<tr class="' + (inCut ? 'cut ' : '') + (cut && idx === cut - 1 ? 'cutline ' : '') +
-         (r.dropped ? 'out' : '') + '">' +
+         (podium ? 'top4 ' : '') + (r.dropped ? 'out' : '') + '">' +
          '<td class="rk">' + r.rank + '</td>' +
          '<td class="l"><div class="nmcell"><i>' + r.no + '</i>' + esc(r.name) +
            (r.byes ? ' <span style="color:var(--dim);font-size:12px">輪空' + r.byes + '</span>' : '') +
@@ -1055,18 +1085,36 @@ function pvLine(st, m, which, f, rank) {
          '<span class="rec" style="font-size:' + (f * .6) + 'vw">' + (rank[id] || '') + '</span></div>';
 }
 
+/* 名次投影是頒獎跟散場前最後一個畫面，所以：
+     · 全部的人都要上得去。切到前 16 名，第 17 名以後的人看不到自己。
+     · 前四名要一眼認得出來 —— 那是有獎的名次。
+   欄數跟對戰表一樣用試的：一到四欄各算一次，挑「字能最大」的那個。
+   一列橫向大約放得下 20 個字寬（名次 + 編號 + 名字 + 戰績 + 積分）。 */
 function paintPvRank(st) {
-  var rows = E.standings(st.players, st.matches, st.config.rules).slice(0, 16);
+  var rows = E.standings(st.players, st.matches, st.config.rules);
   var cut = st.config.cut || 0;
   var played = rows.some(function (r) { return r.played > 0; });
-  var rowsN = Math.ceil(rows.length / 2) || 1;
+  var live = rows.filter(function (r) { return !r.dropped; });
+  var n = rows.length || 1;
   var vh = 100 * (window.innerHeight || 900) / (window.innerWidth || 1600);
-  var f = Math.max(.8, Math.min(2.6, (vh * 0.74) / rowsN * 0.42));
 
-  var h = '<div class="pv-rank" style="grid-template-rows:repeat(' + rowsN + ',1fr)">';
+  var best = { f: 0, cols: 1, rows: n };
+  for (var c = 1; c <= Math.min(4, n); c++) {
+    var rN = Math.ceil(n / c);
+    var cw = 100 / c, ch = (vh * 0.74) / rN;
+    var fit = Math.min(cw / 20, ch / 1.75);
+    if (fit > best.f) best = { f: fit, cols: c, rows: rN };
+  }
+  var f = Math.max(.5, Math.min(2.6, best.f));
+
+  var h = '<div class="pv-rank" style="grid-template-columns:repeat(' + best.cols +
+          ',1fr);grid-template-rows:repeat(' + best.rows + ',1fr)">';
   rows.forEach(function (r) {
+    var idx = live.indexOf(r);
+    var podium = played && !r.dropped && idx > -1 && idx < 4;
     h += '<div class="pv-rk' + (cut && played && r.rank <= cut ? ' in' : '') +
-         (r.dropped ? ' out' : '') + '" style="padding:' + (f * .16) + 'vw ' + (f * .6) + 'vw">' +
+         (podium ? ' top4' : '') + (r.dropped ? ' out' : '') +
+         '" style="padding:' + (f * .16) + 'vw ' + (f * .6) + 'vw">' +
          '<b style="font-size:' + (f * 1.15) + 'vw;flex-basis:' + (f * 1.8) + 'vw">' + r.rank + '</b>' +
          '<i style="font-size:' + (f * .56) + 'vw">' + r.no + '</i>' +
          '<span style="font-size:' + f + 'vw">' + esc(r.name) + '</span>' +
@@ -1084,7 +1132,7 @@ function tick() {
   var ms = remainMs(st), has = st.timer.durMs > 0;
   var txt = has ? fmtCount(ms) : '';
   el('roundClock').textContent = has ? (st.timer.running ? txt : txt + '（暫停）') : '不計時';
-  el('btnTimer').textContent = st.timer.running ? '暫停計時' : '開始計時';
+  el('btnTimer').textContent = st.timer.running ? '⏸　暫停計時' : '▶　開始計時';
   el('btnTimer').style.display = has ? '' : 'none';
 
   var c = el('pvCount');

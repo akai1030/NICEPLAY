@@ -141,6 +141,7 @@ E.nextRound(state);                     // { matches } | { done } | { error }
 ```bash
 node test/engine.test.js    # 引擎 11 組
 node server/test.js         # 伺服器 8 組
+node test/net.test.js       # 連線層 3 組（會自己起伺服器）
 
 python3 -m http.server 8123
 #  /test/e2e.html                                單機端對端
