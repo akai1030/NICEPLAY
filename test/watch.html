@@ -166,6 +166,51 @@
     say('  state 只有選手碼，沒有副控密碼 ✓');
 
     /* ── 副控：網址 + 密碼 ─────────────────── */
+    say('\n【3d】投影的 QR 不能蓋到任何一格對戰');
+    /* 投影畫面每一格都是有人要看的資訊，浮在上面一定會擋到誰。
+       QR 排進頁尾那一列，用實際座標驗證重疊為零。 */
+    W(H).location.hash = 'present';
+    D(H).body.classList.add('present');
+    var rz = D(H).createEvent('HTMLEvents'); rz.initEvent('resize', true, true);
+    W(H).dispatchEvent(rz);
+    await sleep(600);
+    var qr = el(H, 'pvQR').getBoundingClientRect();
+    /* QR 用 vw 排版，所以門檻要跟著這個視窗的寬度算。
+       真的投影機是 1920 寬，3.6vw 大約 69px。 */
+    var vw = W(H).innerWidth;
+    ok(qr.width > vw * 0.06 && qr.height > vw * 0.03,
+       '投影 QR 太小：' + Math.round(qr.width) + '×' + Math.round(qr.height) +
+       '（視窗寬 ' + vw + '）');
+    var worst = 0;
+    D(H).querySelectorAll('.pv-seat').forEach(function (n) {
+      var r = n.getBoundingClientRect();
+      var ox = Math.min(r.right, qr.right) - Math.max(r.left, qr.left);
+      var oy = Math.min(r.bottom, qr.bottom) - Math.max(r.top, qr.top);
+      if (ox > 0 && oy > 0) worst = Math.max(worst, ox * oy);
+    });
+    ok(worst === 0, '投影 QR 蓋住了對戰格，重疊 ' + Math.round(worst) + ' px²');
+    var ftr = D(H).querySelector('.pv-ft').getBoundingClientRect();
+    ok(qr.bottom <= ftr.bottom + 1 && qr.top >= ftr.top - 1, 'QR 沒有待在頁尾裡');
+    say('  QR ' + Math.round(qr.width) + '×' + Math.round(qr.height) +
+        '，與對戰格重疊 0 px² ✓');
+    D(H).body.classList.remove('present');
+    W(H).location.hash = '';
+    await sleep(300);
+
+    say('\n【3e】每個名字後面都有幾勝幾敗');
+    click(H, D(H).querySelector('.tabs button[data-tab="tPlay"]')); await sleep(200);
+    var sides = D(H).querySelectorAll('#matchList .mt .sd:not(.bye)');
+    ok(sides.length > 0, '對戰卡不見了');
+    var withRec = 0;
+    sides.forEach(function (n) {
+      var r = n.querySelector('.rec');
+      if (r && /^\d+-\d+/.test(r.textContent.trim())) withRec++;
+    });
+    ok(withRec === sides.length,
+       '有 ' + (sides.length - withRec) + ' 個名字後面沒有戰績');
+    say('  對戰卡 ' + sides.length + ' 個名字全部帶著戰績（' +
+        sides[0].querySelector('.rec').textContent.trim() + ' 這種）✓');
+
     say('\n【4】副控：打開網址看到密碼輸入畫面');
     var staffHash = staffURL.slice(staffURL.indexOf('#'));
     await load(S, '../index.html'); iso(S); W(S).localStorage.clear(); W(S).sessionStorage.clear();
@@ -231,6 +276,17 @@
         el(P, 'wtTable').textContent + ' 桌 · ' +
         el(P, 'wtOpp').textContent.replace(/\s+/g, ' ').trim() + ' · ' +
         el(P, 'wtStat').textContent.trim() + ' ✓');
+
+    say('\n【9b】選手畫面的對戰表也要有戰績');
+    var wsides = D(P).querySelectorAll('#wtMatches .wr .p');
+    ok(wsides.length > 0, '選手畫面沒有對戰列');
+    var wRec = 0;
+    wsides.forEach(function (n) {
+      var e = n.querySelector('em');
+      if (e && /^\d+-\d+/.test(e.textContent.trim())) wRec++;
+    });
+    ok(wRec === wsides.length, '選手畫面有 ' + (wsides.length - wRec) + ' 個名字沒有戰績');
+    say('  選手畫面 ' + wsides.length + ' 個名字全部帶著戰績 ✓');
 
     say('\n【10】選手重整之後還是選手畫面（上一版就是這裡壞掉）');
     await load(P, '../index.html' + joinHash); iso(P); await sleep(1800);

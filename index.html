@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608160320">
+<link rel="stylesheet" href="src/style.css?v=202608161531">
 </head>
 <body>
 
@@ -206,9 +206,11 @@
     <span class="num" id="roundClock"></span>
   </div>
   <div id="matchList"></div>
+  <!-- 現場的順序就是：先開始計時，打完回報，最後才排下一輪。
+       兩顆是同一個層級的動作，所以同樣大、同樣重，按照時間先後排。 -->
   <div class="row sec-gap">
+    <button class="main big" id="btnTimer" style="flex:1 1 220px">開始計時</button>
     <button class="main big" id="btnNext" style="flex:1 1 220px">下一輪</button>
-    <button class="sm" id="btnTimer">開始計時</button>
     <button class="sm danger" id="btnRepair">重排這一輪</button>
   </div>
   <div class="hint" id="playMsg"></div>
@@ -314,16 +316,16 @@
     <div class="pv-count num" id="pvCount"><b id="pvClock">--:--</b><i id="pvLabel">本輪剩餘</i></div>
   </div>
   <div class="pv-body" id="pvBody"></div>
-  <div class="pv-qr" id="pvQR" hidden>
-    <div class="pv-qr-img" id="pvQRImg"></div>
-    <div class="pv-qr-cap">掃我<em>查自己在第幾桌</em></div>
-  </div>
   <div class="pv-ft">
     <span class="k"><i class="mk"></i><i class="wm"></i><em>連線整合賽事次世代系統</em></span>
     <span class="grow" id="pvFoot"></span>
     <span class="exit">點畫面切換對戰表／名次　·　1 對戰表　2 名次　F 全螢幕　Esc 離開全螢幕</span>
     <button class="sm" id="btnFull">全螢幕</button>
     <button class="sm" id="btnClosePv">關閉投影窗</button>
+    <div class="pv-qr" id="pvQR" hidden>
+      <div class="pv-qr-img" id="pvQRImg"></div>
+      <div class="pv-qr-cap">掃我查桌號</div>
+    </div>
   </div>
 </div>
 
@@ -348,28 +350,12 @@
       Every Match <b>Connects.</b> Every Play <b>Counts.</b>
       <span>CONNECT · COMPETE · PLAY</span>
     </div>
-    <p class="bk-manifesto">
-      每一場對局都會接上下一場，每一次出手都算進最後的名次。<br>
-      <b>NICEPLAY</b> 把一場實體賽事看成一張網 ——
-      選手是<b>節點</b>，對戰是<b>連線</b>，賽程樹是這張網長出來的形狀。
-      系統要做的事只有一件：讓這張網從第一輪一路長到冠亞軍，中間不斷、不歪、不用你算。
-    </p>
-    <div class="bk-name">
-      <span class="bk-en">NICEPLAY</span>
-      <span class="bk-full">Networked Integrated Competition &amp; Event Platform for League And Yomi</span>
-      <span class="bk-cn">連線整合賽事次世代系統</span>
-    </div>
     <div class="bk-decode">
       <span><b>N</b>etworked　連線</span><span><b>I</b>ntegrated　整合</span>
       <span><b>C</b>ompetition　競技</span><span><b>E</b>vent　賽事</span>
       <span><b>P</b>latform　平臺</span><span><b>L</b>eague　聯賽</span>
       <span><b>A</b>nd　與</span><span><b>Y</b>omi　讀心</span>
     </div>
-    <p class="bk-yomi">
-      <b>Yomi（読み）</b>是格鬥與卡牌圈講的「讀」——
-      讀對手的下一步、讀場上的分差、讀這一輪該不該冒險。
-      機器算得出誰跟誰打，算不出這個。<b>那部分留給坐在桌前的人。</b>
-    </p>
   </div>
 
   <p class="bk-lede">
@@ -510,22 +496,16 @@
        而且 36 小時後自動消掉。<b>副控密碼不會出現在傳給選手的資料裡。</b></p>
     <p><b>一場最多幾人？</b>沒有上限。512 人九輪也是一瞬間排完。</p>
     <p><b>QR 會不會外連？</b>不會，是這個網頁自己畫的，沒有任何第三方服務。</p>
-    <p><b>可以自己架嗎？</b>可以，這是開源的（MIT）：
-       <span class="key">github.com/akai1030/NICEPLAY</span><br>
-       自己架伺服器的話，發出去的連結會自動帶上位址，對方不用設定。</p>
   </div></div>
 
   <div class="bk-thanks">
     <h3>特別鳴謝</h3>
     <div class="th">
       <b>桌遊記</b>
-      <span>從賽事到活動執行的全方面資源。這套系統不是在白板上想出來的，
-        是在真的有人坐下來對局、真的要在時間內排完下一輪的現場長出來的 ——
-        每一個看起來理所當然的設計，背後都有一次「那天差點來不及」。</span>
+      <span>從賽事到活動執行全方面的支援。</span>
     </div>
     <div class="th">
       <b>轉駅創研試驗所</b>
-      <span>把「做一個工具給大家用」這件事當成可以認真投入的事。</span>
     </div>
   </div>
 
@@ -533,11 +513,11 @@
 
 <div id="toast"></div>
 
-<script src="src/qr.js?v=202608160320"></script>
-<script src="src/engine.js?v=202608160320"></script>
-<script src="src/store.js?v=202608160320"></script>
-<script src="src/net.js?v=202608160320"></script>
-<script src="src/ui.js?v=202608160320"></script>
+<script src="src/qr.js?v=202608161531"></script>
+<script src="src/engine.js?v=202608161531"></script>
+<script src="src/store.js?v=202608161531"></script>
+<script src="src/net.js?v=202608161531"></script>
+<script src="src/ui.js?v=202608161531"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -545,7 +525,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608160320').catch(function () {});
+    navigator.serviceWorker.register('sw.js?v=202608161531').catch(function () {});
   });
 }
 </script>

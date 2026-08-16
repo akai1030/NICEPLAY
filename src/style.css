@@ -233,9 +233,16 @@ button.big { min-height: 60px; font-size: 18px; }
             background: var(--line-hard); padding: 2px 6px; border-radius: 3px;
             min-width: 22px; text-align: center; flex: 0 0 auto; }
 .mt .sd .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 名字後面永遠掛著幾勝幾敗 —— 現場最常被問的就是這個 */
+.mt .sd .rec { margin-left: auto; flex: 0 0 auto; font-family: var(--f-mono);
+               font-size: 12.5px; font-weight: 700; color: var(--faint); }
+.mt .sd.win .rec { color: rgba(11,13,18,.6); }
 .mt .sd.win { background: var(--lime); border-color: var(--lime); color: var(--black); }
 .mt .sd.win i { background: rgba(0,0,0,.35); color: var(--white); }
-.mt .sd.win::after { content: '勝'; margin-left: auto; font-size: 13px; font-weight: 900; }
+/* 靠右對齊的工作交給 .rec 的 auto margin；「勝」只跟在它後面。
+   兩個都寫 auto 的話 flex 會把空白平分，贏的那一格戰績就會浮到中間，
+   跟輸的那一格對不齊。 */
+.mt .sd.win::after { content: '勝'; margin-left: .5em; font-size: 13px; font-weight: 900; }
 .mt .sd.lose { color: var(--faint); }
 .mt .sd.lose i { opacity: .55; }
 .mt .sd.bye { opacity: .55; cursor: default; justify-content: center; font-weight: 400; }
@@ -247,9 +254,13 @@ button.big { min-height: 60px; font-size: 18px; }
 .mt .dw.on { background: var(--gold); border-style: solid; border-color: var(--gold);
              color: var(--black); font-weight: 900; }
 
-.prog { display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+.prog { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
         font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; color: var(--dim); }
 .prog b { color: var(--accent-fg); font-size: 22px; font-weight: 700; }
+/* 剩餘時間跟回報進度是同一個級距的資訊 —— 原本 12px 的灰字，
+   站起來看對戰表的時候根本讀不到。 */
+#roundClock { flex: 0 0 auto; font-size: 22px; font-weight: 700; color: var(--fg);
+              letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 .prog .bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .prog .bar i { display: block; height: 100%; background: var(--grad); transition: width .3s; }
 
@@ -414,6 +425,8 @@ body.player #btnBook { display: none !important; }
 .wr.mine .t { color: var(--accent-fg); }
 .wr .p { flex: 1 1 0; min-width: 0; white-space: nowrap;
          overflow: hidden; text-overflow: ellipsis; }
+.wr .p em { font-style: normal; font-family: var(--f-mono); font-size: 12px;
+            font-weight: 700; color: var(--faint); margin-left: 6px; }
 .wr .p.win { color: var(--accent-fg); font-weight: 900; }
 .wr .p.lose { color: var(--faint); }
 .wr .x { flex: 0 0 auto; font-family: var(--f-serif); font-size: 12px; color: var(--faint); }
@@ -434,16 +447,16 @@ body.player #btnBook { display: none !important; }
 .qr-url { font-size: 12px; color: #555; margin: 6px 0 16px; word-break: break-all; }
 .qr-card button { min-width: 160px; }
 
-/* 投影畫面右下角常駐的小 QR：全場隨時可以掃 */
-.pv-qr { position: absolute; right: 2.1vw; bottom: 5.4vw; z-index: 2;
-         background: #FFF; border-radius: .7vw; padding: .55vw .55vw .35vw;
-         text-align: center; box-shadow: 0 .3vw 1.4vw rgba(0,0,0,.5); }
-.pv-qr-img { width: 7.2vw; height: 7.2vw; }
+/* 投影的常駐 QR 排在頁尾那一列裡，不用絕對定位蓋在對戰表上 ——
+   投影畫面每一格都是有人要看的資訊，浮在上面一定會擋到誰。
+   頁尾為此長高一點，讓 QR 有位置站。 */
+.pv-qr { flex: 0 0 auto; display: flex; align-items: center; gap: .5vw;
+         background: #FFF; border-radius: .6vw; padding: .35vw .7vw .35vw .35vw;
+         margin-left: .6vw; }
+.pv-qr-img { width: 3.6vw; height: 3.6vw; flex: 0 0 auto; }
 .pv-qr-img svg { width: 100%; height: 100%; display: block; }
-.pv-qr-cap { font-size: .72vw; font-weight: 900; color: #0B0D12; margin-top: .25vw;
-             letter-spacing: .04em; }
-.pv-qr-cap em { font-style: normal; font-weight: 400; color: #555;
-                display: block; font-size: .62vw; }
+.pv-qr-cap { font-size: .8vw; font-weight: 900; color: #0B0D12;
+             letter-spacing: .04em; line-height: 1.25; white-space: nowrap; }
 
 /* 副控（手機）只回報勝負，其他都不給碰 —— 避免在店裡誤觸改設定 */
 body.guest .tabs button[data-tab="tSetup"] { display: none; }
@@ -482,8 +495,8 @@ body.present #present { display: flex; }
 .pv-count.urgent b { color: var(--red); }
 .pv-body { flex: 1 1 auto; padding: 1.4vw 2.1vw; overflow: hidden; }
 .pv-ft { flex: 0 0 auto; display: flex; align-items: center; gap: 1.5vw;
-         padding: .85vw 2.1vw; border-top: 1px solid var(--label-line);
-         font-size: 1.4vw; background: var(--bg); }
+         padding: .6vw 2.1vw; border-top: 1px solid var(--label-line);
+         font-size: 1.4vw; background: var(--bg); min-height: 4.6vw; }
 .pv-ft .k { display: flex; align-items: center; gap: .55vw; }
 .pv-ft .k .mk { width: 1.9vw; height: 1.9vw; flex: 0 0 auto;
   background: url(../assets/mark.png) center/contain no-repeat; }

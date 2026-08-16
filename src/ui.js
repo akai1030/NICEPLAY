@@ -81,6 +81,19 @@ function numOf(st, id) {
 }
 function alive(st) { return st.players.filter(function (p) { return !p.dropped; }); }
 
+/* 每個人的戰績查表。名字後面隨時看得到幾勝幾敗 ——
+   現場最常被問的就是這個，而且會被問到主辦沒空排下一輪。
+   算一次給整個畫面共用，不要每張卡各算一次。 */
+function recMap(st) {
+  var out = {};
+  try {
+    E.standings(st.players, st.matches, st.config.rules).forEach(function (x) {
+      out[x.id] = { rec: x.w + '-' + x.l + (x.d ? '-' + x.d : ''), pts: x.pts, rank: x.rank };
+    });
+  } catch (e) {}
+  return out;
+}
+
 /* 目前這一輪的 key（數字或「八強」這種字串） */
 function currentRound(st) {
   if (!st.matches.length) return null;
@@ -598,17 +611,22 @@ function paintWatch(st) {
   /* 本輪對戰（唯讀） */
   var ms = (r === null) ? [] : matchesOf(st, r);
   el('wtMatchTitle').textContent = r === null ? '本輪對戰' : roundLabel(r) + '　對戰';
+  var wrm = recMap(st);
+  /* 這裡不要再用 r 當變數名 —— 外面的 r 是「第幾輪」 */
+  var who = function (id, cls) {
+    var rec = wrm[id];
+    return '<span class="p' + cls + '">' + esc(nameOf(st, id)) +
+           (rec ? '<em class="num">' + rec.rec + '</em>' : '') + '</span>';
+  };
   el('wtMatches').innerHTML = ms.length ? ms.map(function (m) {
     var isMine = (m.a === meId || m.b === meId);
     var bye = (m.b === null || m.b === undefined);
     var ca = m.result === 'a' ? ' win' : (m.result === 'b' ? ' lose' : '');
     var cb = m.result === 'b' ? ' win' : (m.result === 'a' ? ' lose' : '');
     return '<div class="wr' + (isMine ? ' mine' : '') + '">' +
-      '<span class="t">' + esc(m.table) + '</span>' +
-      '<span class="p' + ca + '">' + esc(nameOf(st, m.a)) + '</span>' +
+      '<span class="t">' + esc(m.table) + '</span>' + who(m.a, ca) +
       (bye ? '<span class="s">輪空</span>'
-           : '<span class="x">VS</span><span class="p' + cb + '">' +
-             esc(nameOf(st, m.b)) + '</span>') +
+           : '<span class="x">VS</span>' + who(m.b, cb)) +
       '</div>';
   }).join('') : '<div class="hint">還沒排對戰。</div>';
 
@@ -901,29 +919,32 @@ function paintMatches(st) {
   el('progDone').textContent = done + '/' + playable.length;
   el('progBar').style.width = (playable.length ? 100 * done / playable.length : 0) + '%';
 
+  var rm = recMap(st);
   el('matchList').innerHTML = ms.map(function (m) {
     var live = st.config.liveTable && m.table === st.config.liveTable;
     var mine = net.role === 'watch' && meId && (m.a === meId || m.b === meId);
     var h = '<div class="mt' + (m.result ? ' done' : '') + (live ? ' islive' : '') +
             (mine ? ' mine' : '') + '">' +
             '<div class="tb">' + esc(m.table) + '</div>';
-    h += side(st, m, 'a');
+    h += side(st, m, 'a', rm);
     if (m.b === null || m.b === undefined) {
       h += '<div class="sd bye">輪空 · 視同勝</div>';
     } else {
       h += '<div class="dw' + (m.result === 'draw' ? ' on' : '') + '" data-t="' +
-           esc(m.table) + '" data-r="draw">平手</div>' + side(st, m, 'b');
+           esc(m.table) + '" data-r="draw">平手</div>' + side(st, m, 'b', rm);
     }
     return h + '</div>';
   }).join('');
 }
-function side(st, m, which) {
+function side(st, m, which, rm) {
   var id = which === 'a' ? m.a : m.b;
   var cls = 'sd';
   if (m.result === which) cls += ' win';
   else if (m.result && m.result !== 'draw' && m.result !== 'bye') cls += ' lose';
+  var r = rm && rm[id];
   return '<div class="' + cls + '" data-t="' + esc(m.table) + '" data-r="' + which + '">' +
-         '<i>' + numOf(st, id) + '</i><span class="who">' + esc(nameOf(st, id)) + '</span></div>';
+         '<i>' + numOf(st, id) + '</i><span class="who">' + esc(nameOf(st, id)) + '</span>' +
+         (r ? '<span class="rec num">' + r.rec + '</span>' : '') + '</div>';
 }
 
 /* 排名表 */
