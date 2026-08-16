@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#555}iframe{border:0;display:block}
+</style></head><body>
+<!-- 排名頁截圖用。跟 shot.html 同一套做法，差別是先把四場都打完，
+     這樣 OMW / OOMW 才有數字，同分也才看得出破同分的順序。 -->
+<iframe id="f"></iframe>
+<script>
+var q = new URLSearchParams(location.search);
+var theme = q.get('theme') || 'dark';
+var W = +(q.get('w') || 390), H = +(q.get('h') || 900);
+var names = ['你','我','他','他們'];
+var players = names.map(function(n,i){return {id:'p'+(i+1),no:i+1,name:n,dropped:(q.get('drop')==='1'&&i===3)};});
+var matches = [
+ {round:1,table:'1',a:'p1',b:'p2',result:'a'},
+ {round:1,table:'2',a:'p3',b:'p4',result:'a'},
+ {round:2,table:'1',a:'p1',b:'p3',result:'b'},
+ {round:2,table:'2',a:'p2',b:'p4',result:'a'}
+];
+localStorage.setItem('niceplay.state.v1', JSON.stringify({
+  v:1, rev:5, theme:theme, phase:'running',
+  event:{name:'週三夜間賽',date:'2026-08-16'},
+  config:{format:'swiss',rounds:3,cut:0,minutes:25,tableNaming:'number',
+          tableCount:2,customTables:[],rules:{win:3,draw:1,loss:0,minWinPct:0.25},liveTable:'1'},
+  players:players, matches:matches,
+  timer:{running:false,endsAt:0,left:1500}
+}));
+localStorage.removeItem('niceplay.net.v1');
+var f = document.getElementById('f');
+f.style.width = W+'px'; f.style.height = H+'px';
+f.src = '../index.html';
+f.onload = function(){
+  var d = f.contentDocument;
+  var tries = 0;
+  (function go(){
+    var t = d.getElementById('tabRank');
+    if (t && !t.disabled) t.click();
+    if (d.getElementById('tRank').classList.contains('on') || ++tries > 20) {
+      document.title = 'READY'; return;
+    }
+    setTimeout(go, 200);
+  })();
+};
+</script></body></html>
