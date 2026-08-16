@@ -144,5 +144,77 @@ head('【8】名單解析：隊伍寫法');
   console.log('  @ 與全形括號都認得，邊界情況不會切壞 ✓');
 }
 
+head('【9】蛇形分組：不能讓某一組拿走所有的單數順位');
+{
+  const ps = Array.from({ length: 16 }, (_, i) => P('p' + i, i + 1, 'P' + i));
+  const g = E.assignGroups(ps, 2).map(p => p.group).join('');
+  eq(g, 'ABBAABBAABBAABBA', '兩組的蛇形順序');
+  const g3 = E.assignGroups(ps, 3).map(p => p.group).join('');
+  eq(g3.slice(0, 6), 'ABCCBA', '三組的蛇形順序');
+  /* 兩組各拿到一半的人 */
+  const two = E.assignGroups(ps, 2);
+  eq(E.inGroup(two, 'A').length, 8, 'A 組人數');
+  eq(E.inGroup(two, 'B').length, 8, 'B 組人數');
+  console.log('  蛇形分完人數平均，順位也不會偏向某一組 ✓');
+}
+
+head('【10】各組分開配對，桌號一路接下去');
+{
+  const ps = E.assignGroups(
+    Array.from({ length: 16 }, (_, i) => P('p' + i, i + 1, 'P' + i)), 2);
+  const st = { config: { format: 'swiss', rounds: 2, cut: 4, groups: 2,
+                         bo: 1, boKO: 3, tableNaming: 'number' },
+               players: ps, matches: [] };
+  const r1 = E.nextRound(st);
+  ok(!r1.error, '應該排得出來：' + r1.error);
+  eq(r1.matches.length, 8, '16 人分兩組應該排 8 桌');
+  eq(r1.matches.map(m => m.table).join(','), '1,2,3,4,5,6,7,8',
+     '桌號應該連號，不能每組從 1 開始');
+  ok(r1.matches.every(m => m.group), '每一場都要標出是哪一組的');
+
+  /* 同一場的兩個人一定同組 */
+  const gm = {}; ps.forEach(p => { gm[p.id] = p.group; });
+  ok(r1.matches.every(m => !m.b || gm[m.a] === gm[m.b]),
+     '預賽階段出現了跨組對戰');
+  console.log('  各組自己打，桌號連號，沒有跨組 ✓');
+}
+
+head('【11】切進淘汰賽時交叉種子：第一輪一定跨組');
+{
+  const ps = E.assignGroups(
+    Array.from({ length: 16 }, (_, i) => P('p' + i, i + 1, 'P' + i)), 2);
+  const st = { config: { format: 'swiss', rounds: 2, cut: 4, groups: 2,
+                         bo: 1, boKO: 3, tableNaming: 'number' },
+               players: ps, matches: [] };
+  for (let r = 1; r <= 2; r++) {
+    const res = E.nextRound(st);
+    res.matches.forEach(m => { m.round = r; m.result = m.b === null ? 'bye' : 'a'; });
+    st.matches = st.matches.concat(res.matches);
+  }
+  const ko = E.nextRound(st);
+  ok(!ko.error, '應該排得出淘汰賽：' + ko.error);
+  eq(ko.matches.length, 2, '各組取前 2 名＝共 4 人＝2 場');
+  const gm = {}; ps.forEach(p => { gm[p.id] = p.group; });
+  ok(ko.matches.every(m => m.b && gm[m.a] !== gm[m.b]),
+     '淘汰賽第一輪出現了同組對戰 —— 交叉種子沒生效');
+  ok(ko.notes.some(n => n.indexOf('交叉') >= 0), '應該說明是交叉對戰');
+  console.log('  各組前 2 名交叉，第一輪全是跨組 ✓');
+}
+
+head('【12】某一組人數不足時不整個失敗，跳過並講一聲');
+{
+  const ps = [P('p1', 1, 'A1'), P('p2', 2, 'A2'), P('p3', 3, 'A3')];
+  ps[0].group = 'A'; ps[1].group = 'A'; ps[2].group = 'B';   /* B 組只有一個人 */
+  const st = { config: { format: 'swiss', rounds: 2, cut: 0, groups: 2,
+                         bo: 1, boKO: 1, tableNaming: 'number' },
+               players: ps, matches: [] };
+  const r = E.nextRound(st);
+  ok(!r.error, '不該整個失敗：' + r.error);
+  eq(r.matches.length, 1, 'A 組還是要排得出一桌');
+  ok(r.notes.some(n => n.indexOf('B') >= 0 && n.indexOf('不足') >= 0),
+     '應該講出是哪一組人數不足：' + JSON.stringify(r.notes));
+  console.log('  一組不夠人不會拖垮整場，而且說得出是哪一組 ✓');
+}
+
 console.log(fails ? '\n有 ' + fails + ' 項沒過 ❌' : '\n全部通過 ✅');
 process.exit(fails ? 1 : 0);

@@ -180,6 +180,7 @@ function fillForm(st) {
   el('fMinutes').value = st.config.minutes;
   el('fSound').value = (st.config.sound === false) ? '0' : '1';
   el('fLate').value = st.config.lateJoin || 'loss';
+  el('fGroups').value = String(st.config.groups || 0);
   syncFormatFields();
 }
 
@@ -203,6 +204,7 @@ function readForm(st) {
   st.config.minutes = Math.max(0, parseInt(el('fMinutes').value, 10) || 0);
   st.config.sound = el('fSound').value !== '0';
   st.config.lateJoin = el('fLate').value;
+  st.config.groups = parseInt(el('fGroups').value, 10) || 0;
 }
 
 /* 賽制不同，該問的東西也不同 —— 不相關的欄位直接收起來 */
@@ -210,6 +212,7 @@ function syncFormatFields() {
   var f = el('fFormat').value;
   el('wrapRounds').style.display = (f === 'swiss') ? '' : 'none';
   el('wrapCut').style.display = (f === 'swiss') ? '' : 'none';
+  el('wrapGroups').style.display = (f === 'swiss') ? '' : 'none';
   el('wrapCustom').style.display = (el('fNaming').value === 'custom') ? '' : 'none';
 
   /* 純淘汰賽沒有「常規賽」，瑞士制不接淘汰賽就沒有「淘汰賽」——
@@ -362,8 +365,14 @@ function doStart(list) {
   store.commit(function (s) {
     readForm(s);
     s.players = list.map(function (p, i) {
-      return { id: p.id, no: i + 1, name: p.name, dropped: false };
+      return { id: p.id, no: i + 1, name: p.name, team: p.team || '', dropped: false };
     });
+    /* 分組是在開賽的那一刻決定的。用蛇形分配（1→A 2→B 3→B 4→A…）——
+       照順序輪流發會讓 A 組拿到所有單數順位，強弱不平均。
+       名單順序就是分組順序，想指定誰在哪一組就自己排名單。 */
+    var gn = s.config.groups || 0;
+    if (gn >= 2) s.players = E.assignGroups(s.players, gn);
+    else s.players.forEach(function (p) { delete p.group; });
     s.matches = [];
     s.timer = { running: false, endsAt: 0, remainMs: 0, durMs: 0, round: null };
     s.phase = 'running';
@@ -1786,7 +1795,28 @@ function side(st, m, which, rm, bo, g) {
 function paintRank(st) {
   if (!st.players.length) { el('rankView').innerHTML =
     '<div class="hint">還沒有名單。</div>'; return; }
-  var rows = E.standings(st.players, st.matches, st.config.rules);
+
+  /* 分組賽的名次一定要分組看。把各組混在一起排，數字就沒有意義了 ——
+     A 組第 1 跟 B 組第 1 打的是完全不同的一批人，積分不可比。 */
+  var gids = E.groupIds(st.config);
+  if (gids.length >= 2 && st.players.some(function (p) { return p.group; })) {
+    el('rankView').innerHTML = gids.map(function (g) {
+      var gp = E.inGroup(st.players, g);
+      if (!gp.length) return '';
+      var gm = E.groupMatches(st.matches, gp.map(function (p) { return p.id; }));
+      return '<h3 class="grp">' + g + ' 組　<span>' + gp.length + ' 人</span></h3>' +
+             rankTable(st, gp, gm);
+    }).join('');
+    var per = Math.max(1, Math.floor((st.config.cut || 0) / gids.length));
+    el('rankTitle').textContent = st.config.cut
+      ? '分組名次 · 各組前 ' + per + ' 名晉級' : '分組名次';
+    return;
+  }
+  el('rankView').innerHTML = rankTable(st, st.players, st.matches);
+}
+
+function rankTable(st, players, matches) {
+  var rows = E.standings(players, matches, st.config.rules);
   var live = rows.filter(function (r) { return !r.dropped; });
   var cut = st.config.cut || 0;
   el('rankTitle').textContent = cut ? '即時名次 · 前 ' + cut + ' 名晉級' : '即時名次';
@@ -1798,9 +1828,8 @@ function paintRank(st) {
     return norm(r.name).indexOf(q) >= 0 || String(r.no) === q;
   }) : rows;
   if (q && !shown.length) {
-    el('rankView').innerHTML = '<div class="hint">找不到「' + esc(el('rankFind').value.trim()) +
-      '」。名單上共 ' + rows.length + ' 人。</div>';
-    return;
+    return '<div class="hint">找不到「' + esc(el('rankFind').value.trim()) +
+           '」。這一份名單上共 ' + rows.length + ' 人。</div>';
   }
 
   var h = '<table class="rank"><thead><tr><th>#</th><th class="l">選手</th>' +
@@ -1830,7 +1859,7 @@ function paintRank(st) {
          '<td><button class="dropb' + (r.dropped ? ' on' : '') + '" data-id="' + r.id + '">' +
            (r.dropped ? '已退賽' : '退賽') + '</button></td></tr>';
   });
-  el('rankView').innerHTML = h + '</tbody></table>';
+  return h + '</tbody></table>';
 }
 
 /* 投影 */

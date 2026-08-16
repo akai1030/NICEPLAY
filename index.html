@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608170007">
+<link rel="stylesheet" href="src/style.css?v=202608170013">
 </head>
 <body>
 
@@ -109,6 +109,13 @@
       </select></label>
     <label class="fld" id="wrapRounds"><span>輪數</span>
       <input type="number" id="fRounds" min="1" max="20"></label>
+    <label class="fld" id="wrapGroups"><span>分組</span>
+      <select id="fGroups">
+        <option value="0">不分組　全部一起跑</option>
+        <option value="2">分 2 組　A / B</option>
+        <option value="3">分 3 組　A / B / C</option>
+        <option value="4">分 4 組　A / B / C / D</option>
+      </select></label>
     <label class="fld" id="wrapCut"><span>取前幾名打淘汰賽</span>
       <select id="fCut">
         <option value="0">不打，瑞士制到底</option>
@@ -545,8 +552,13 @@
     <ul>
       <li><b>瑞士制</b> —— 一般店賽就選這個。同分打同分、不會遇到同一個對手、人數單數自動輪空。</li>
       <li><b>單敗淘汰</b> —— 輸一場就結束。</li>
+      <li><b>雙敗淘汰</b> —— 輸一場掉到敗部，敗部再輸才結束。場次大約是單敗的兩倍，
+        但每個人至少打兩場。總決賽如果是敗部冠軍贏，兩邊都只輸一場，系統會自動加賽一場。</li>
       <li><b>循環賽</b> —— 每個人都打過一次，適合小人數。</li>
     </ul>
+    <p><b>分組</b>是給場地分兩區、或人多想縮短輪數時用的：分 2～4 組各自跑瑞士制，
+       最後各組取前幾名交叉打淘汰賽（同組的人最快要決賽才會再遇到）。
+       分組是按<b>名單順序蛇形分配</b>，想指定誰在哪一組就自己排名單。</p>
     <p><b>輪數</b>留白會自動建議（8 人 3 輪、16 人 4 輪、32 人 5 輪）。
        <b>桌號</b>可以是數字、字母，或自己打（例如 Q1, Q2）。
        <b>主桌／直播桌</b>填了之後，那一桌在投影畫面會被框起來。</p>
@@ -586,8 +598,16 @@
        名字旁邊的點點就是這一場的進度，點滿就拿下。點錯按卡片右邊的
        <span class="key">⌫ 退一局</span> 往回退 —— 勝負一旦定了會鎖住，
        要改就先退一局。</p>
+    <p><b>找人</b>：對戰表上方那格打名字或桌號就篩得出來，128 人也不用捲。
+       用鍵盤的話直接打桌號就會跳過去，<span class="key">←</span>
+       <span class="key">→</span> 在同一張卡裡移動，
+       <span class="key">Backspace</span> 退一局。</p>
+    <p><b>排錯了要換人</b>：按「手動換位」，點兩個人就交換位子。
+       同店隊友撞在一起、有人遲到要補進來都用這個 ——
+       被換到的那兩桌會清掉已回報的勝負，因為對手變了。</p>
     <div class="bk-note"><b>建議的現場節奏：</b>時間到 → 給大家幾分鐘確認戰績 → 確認完才按「下一輪」。
-      按下去才會重新排位子，不會提前跑掉。</div>
+      按下去才會重新排位子，不會提前跑掉。時間到會有三聲短音，
+      從投影那臺出來（設定頁可以關）。</div>
     <div class="bk-note"><b>兩顆按鈕長得不一樣是故意的。</b>
       「開始計時」是金色，按錯再按一次就回來；「下一輪」是藍色，而且整輪都回報完
       才會亮成漸層 —— 那時候才是真的該按它。</div>
@@ -628,9 +648,16 @@
       <li><b>有人退賽</b> → 排名頁點他旁邊的「退賽」。他打過的場次還算數，之後不再被排對。</li>
       <li><b>電腦快沒電、想換一臺</b> → 按「匯出存檔」存一個檔，新電腦按「匯入存檔」。
         賽況（名單、賽制、所有勝負、計時）會完整照搬過去。
-        <b>但主控權限不在存檔裡</b> —— 那把鑰匙只存在原本那臺的瀏覽器。
-        所以新電腦匯入之後要<b>重新開房</b>，把新的副控密碼與選手 QR 再發一次；
-        舊房間會在 36 小時後自己消失。</li>
+        <b>主控權限不在存檔裡</b>，但可以另外救：開房之後到設定頁「進階」按
+        <span class="key">複製接管碼</span>，抄在手機備忘錄；新電腦匯入存檔後把它貼回去，
+        就接回同一個房間，<b>副控密碼與選手 QR 都不用重發</b>。
+        沒抄接管碼的話就只能重新開房。</li>
+      <li><b>怕整臺當機</b> → 設定頁按「開啟自動存檔」選一個資料夾，
+        之後每次變動都會自己寫一份檔進去（Chrome / Edge）。</li>
+      <li><b>一天要跑第二場</b> → 最上面「新增一場」。原本那場會完整收進賽事清單，
+        隨時切得回來，不用先匯出再清空。</li>
+      <li><b>誤按了會清掉東西的按鈕</b> → 設定頁下方「還原上一步」。
+        重排、重新開始、匯入、全部清除這四個動作動手前都會自動存一份。</li>
       <li><b>不小心重整、瀏覽器關掉</b> → 直接重新打開網址，資料還在。</li>
       <li><b>對戰／排名分頁是空的</b> → 點進去它會告訴你差什麼、按哪裡補。</li>
       <li><b>副控說連不上</b> → 請他確認網址跟你複製的那條一樣，密碼是六碼。</li>
@@ -704,11 +731,11 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608170007"></script>
-<script src="src/engine.js?v=202608170007"></script>
-<script src="src/store.js?v=202608170007"></script>
-<script src="src/net.js?v=202608170007"></script>
-<script src="src/ui.js?v=202608170007"></script>
+<script src="src/qr.js?v=202608170013"></script>
+<script src="src/engine.js?v=202608170013"></script>
+<script src="src/store.js?v=202608170013"></script>
+<script src="src/net.js?v=202608170013"></script>
+<script src="src/ui.js?v=202608170013"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -716,7 +743,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608170007').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608170013').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {

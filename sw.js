@@ -3,7 +3,7 @@
    比賽資料存在 localStorage，本來就不經過這裡。 */
 /* 版本號由 tools/stamp.sh 蓋上去，跟 index.html 裡的 ?v= 是同一組。
    換版本＝換快取名＝舊的整包丟掉，不會新舊混用。 */
-const VERSION = '202608170007';
+const VERSION = '202608170013';
 const CACHE = 'niceplay-' + VERSION;
 const SHELL = [
   './', './index.html', './manifest.json',
