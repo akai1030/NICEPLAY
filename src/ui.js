@@ -1207,7 +1207,12 @@ function paintRank(st) {
          '<td class="rk">' + r.rank + '</td>' +
          '<td class="l"><div class="nmcell"><i>' + r.no + '</i>' + esc(r.name) +
            (r.byes ? ' <span style="color:var(--dim);font-size:12px">輪空' + r.byes + '</span>' : '') +
-         '</div></td>' +
+         '</div>' +
+         /* 手機上右邊兩欄放不下，同一組數字改掛在名字底下 ——
+            同分的時候，看的人要能自己看出憑什麼是這個順序。 */
+         (played ? '<div class="tbk">OMW ' + (r.omw * 100).toFixed(1) +
+                   '%　OOMW ' + (r.oomw * 100).toFixed(1) + '%</div>' : '') +
+         '</td>' +
          '<td>' + r.w + '-' + r.l + (r.d ? '-' + r.d : '') + '</td>' +
          '<td class="pt">' + r.pts + '</td>' +
          '<td>' + (r.omw * 100).toFixed(1) + '</td>' +

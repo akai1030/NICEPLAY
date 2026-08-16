@@ -341,6 +341,10 @@ table.rank tr.top4 td.rk { color: var(--gold); font-size: 18px; }
 table.rank tr.top4 td.l { box-shadow: inset 3px 0 0 var(--gold); }
 table.rank tr.out td { opacity: .4; }
 table.rank tr.out td.l { text-decoration: line-through; }
+/* 同分的破同分數字。桌機看右邊那兩欄就好，這一行只在窄螢幕出現。
+   窄螢幕時用 inline-block —— 退賽那列的刪除線就不會蓋過這幾個數字。 */
+.tbk { display: none; margin-top: 2px; font-family: var(--f-mono);
+       font-size: 11.5px; color: var(--dim); white-space: nowrap; }
 .nmcell { display: flex; align-items: center; gap: 7px; }
 .nmcell i { font-style: normal; font-family: var(--f-mono); font-size: 11.5px; font-weight: 700;
             background: var(--line-hard); padding: 2px 5px; border-radius: 3px;
@@ -821,9 +825,11 @@ body.present #btnBook { display: none; }
   .acts #btnTimer, .acts #btnNext { flex: 1 1 100%; }
   .acts #btnRepair { flex: 1 1 100%; }
 
-  /* OMW / OOMW 在手機上讀不了也用不到，收起來留寬度給名字 */
+  /* OMW / OOMW 兩欄在手機上擠掉名字，所以收起來 ——
+     但數字本身要留著，改成名字底下那一行（.tbk）。 */
   table.rank th:nth-child(5), table.rank td:nth-child(5),
   table.rank th:nth-child(6), table.rank td:nth-child(6) { display: none; }
+  table.rank .tbk { display: inline-block; }
   table.rank { font-size: 16px; }
 
   .prog b { font-size: 20px; }
@@ -852,6 +858,11 @@ body.present #btnBook { display: none; }
   table.rank td.pt { color: #0a6b2e; }
   table.rank tr.cut td { background: #eef7e6; }
   table.rank tr.cutline td { border-bottom: 1.5pt solid #0a6b2e; }
+  /* 紙張不受手機寬度限制 —— OMW / OOMW 印回原本的兩欄，
+     名字底下那一行就不用重複了。 */
+  table.rank th:nth-child(5), table.rank td:nth-child(5),
+  table.rank th:nth-child(6), table.rank td:nth-child(6) { display: table-cell !important; }
+  .tbk { display: none !important; }
   .nmcell i { background: #eee; color: #333; }
   h2.sec { color: #555; }
   h2.sec em { color: #111; }
