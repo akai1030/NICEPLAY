@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608161634">
+<link rel="stylesheet" href="src/style.css?v=202608161643">
 </head>
 <body>
 
@@ -201,7 +201,8 @@
       <label class="fld"><span>房間伺服器位址</span>
         <input type="text" id="fServer" placeholder="https://你的房間伺服器"></label>
       <div class="hint">現場網路不通、或對方沒辦法點連結時，可以用唸的。
-        自己架伺服器才需要改位址。</div>
+        自己架伺服器才需要改位址。<br>
+        目前版本 <b class="num" id="appVer">—</b>　回報問題時附上這一行會快很多。</div>
     </details>
   </div>
 
@@ -210,6 +211,14 @@
     <button class="sm" id="btnExport">匯出存檔</button>
     <button class="sm" id="btnImport">匯入存檔</button>
     <input type="file" id="fileImport" accept="application/json" hidden>
+  </div>
+
+  <!-- 一步還原。只在真的有東西可以還原的時候出現 —— 平常不該佔位子。 -->
+  <div class="row" id="undoBar" hidden>
+    <div class="hint" style="flex:1 1 200px;margin:0">
+      上一個會清掉東西的動作：<b id="undoWhat">—</b>
+    </div>
+    <button class="sm warn" id="btnUndo" style="flex:0 0 auto">還原上一步</button>
   </div>
 
   <div class="danger-zone">
@@ -573,6 +582,8 @@
     <div class="th">
       <b>轉駅創研試驗所</b>
     </div>
+    <p class="hint">版本 <b class="num" id="bookVer">—</b>　·　MIT 授權　·
+      原始碼 github.com/akai1030/NICEPLAY</p>
   </div>
 
   </div></div>
@@ -580,11 +591,11 @@
 
 <div id="toast"></div>
 
-<script src="src/qr.js?v=202608161634"></script>
-<script src="src/engine.js?v=202608161634"></script>
-<script src="src/store.js?v=202608161634"></script>
-<script src="src/net.js?v=202608161634"></script>
-<script src="src/ui.js?v=202608161634"></script>
+<script src="src/qr.js?v=202608161643"></script>
+<script src="src/engine.js?v=202608161643"></script>
+<script src="src/store.js?v=202608161643"></script>
+<script src="src/net.js?v=202608161643"></script>
+<script src="src/ui.js?v=202608161643"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -592,7 +603,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608161634').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608161643').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {

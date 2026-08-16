@@ -153,10 +153,11 @@ E.playGame(match, 'a');                 // { games, result } | null（這一下�
 ## 測試
 
 ```bash
-sh tools/test.sh            # 一次跑完下面五組
+sh tools/test.sh            # 一次跑完下面六組（push 時 GitHub Actions 也會跑）
 
 node test/engine.test.js    # 引擎 11 組　　賽制算得對不對
 node test/bo.test.js        # 幾勝制 12 組　含「小局不影響名次」那條界線
+node test/store.test.js     # 狀態 10 組　　名單解析、匯出匯入、還原點、舊存檔
 node server/test.js         # 伺服器 10 組　HTTP 行為與權限
 node test/net.test.js       # 連線層 4 組　　拿真的 net.js 對真的伺服器跑
 node test/check.js          # 靜態 10 組　　標籤閉合、id、版本章、字級規範

@@ -1,0 +1,25 @@
+# 推上來就跑一次全部的測試。
+#
+# 這個專案沒有建置步驟、沒有相依套件，所以 CI 也不需要 npm install ——
+# 裝好 Node 直接跑 tools/test.sh 就是完整的一輪。
+#
+# 特別重要的是 test/check.js：版本章沒對齊、標籤沒閉合、字級破規範
+# 這幾種都不會讓程式報錯，只會安靜地上到正式站，靠人看是看不出來的。
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 跑全部測試
+        run: sh tools/test.sh

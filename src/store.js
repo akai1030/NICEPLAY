@@ -130,6 +130,32 @@ function create() {
   };
 }
 
+/* ── 還原點 ───────────────────────────────────────────
+   只留「上一步」，一層就好。
+
+   會清掉東西的動作只有四個：重排這一輪、重新開始比賽、匯入存檔、
+   全部清除重來。四個都已經要按兩次才會執行，但兩段確認擋不住
+   「我以為我按的是別顆」—— 而在現場，那一下就是整場的成績。
+
+   存成獨立的一把 key，跟主狀態分開：主狀態壞掉或被清掉的時候，
+   還原點必須還在，不然它就沒有意義了。 */
+var UNDO = 'niceplay.undo.v1';
+
+function saveUndo(state, what) {
+  try {
+    localStorage.setItem(UNDO, JSON.stringify({
+      at: Date.now(), what: what || '上一個動作', state: state
+    }));
+  } catch (e) { /* 空間滿了就算了，本來就是保險 */ }
+}
+function loadUndo() {
+  try {
+    var u = JSON.parse(localStorage.getItem(UNDO));
+    return (u && u.state && u.state.v === 1) ? u : null;
+  } catch (e) { return null; }
+}
+function clearUndo() { try { localStorage.removeItem(UNDO); } catch (e) {} }
+
 /* ── 存讀 ─────────────────────────────────────────────── */
 function save(state) {
   try { localStorage.setItem(KEY, JSON.stringify(state)); }
@@ -161,7 +187,11 @@ function parsePlayers(text) {
     var s = line.trim();
     if (!s) return;
     s = s.replace(/^[\s,、]+/, '');
-    var m = s.match(/^(\d{1,3})[\s.,、:：)\]]+(.+)$/);
+    /* 編號後面的分隔符要連全形一起認 —— 從 Word／Excel 貼過來的中文名單
+       常常是「01）王小明」「1．王小明」「1，王小明」這種全形標點，
+       只認半形的話整串會被當成名字，畫面上就變成「01）王小明」。
+       刻意不收「-」：有人的名字本來就長那樣（3-Ply），切錯比不切更糟。 */
+    var m = s.match(/^(\d{1,3})[\s.,、:：)\]）】．。，；;]+(.+)$/);
     var name = (m ? m[2] : s).trim();
     if (!name) return;
     var k = name.toLowerCase();
@@ -175,6 +205,7 @@ function parsePlayers(text) {
 return {
   KEY: KEY, blank: blank, create: create, uid: uid,
   save: save, load: load, toJSON: toJSON, fromJSON: fromJSON,
+  saveUndo: saveUndo, loadUndo: loadUndo, clearUndo: clearUndo,
   parsePlayers: parsePlayers
 };
 });

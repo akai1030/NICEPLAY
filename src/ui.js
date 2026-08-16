@@ -289,6 +289,7 @@ function startEvent() {
   var list = drafting || st.players;
   if (list.length < 2) { toast('至少要兩位選手', true); return; }
   if (st.matches.length && !confirmOnce('btnStart', '已經有比賽在進行，重新開始會清掉所有配對與勝負 —— 再按一次確定')) return;
+  if (st.matches.length) markUndo('重新開始比賽');
 
   store.commit(function (s) {
     readForm(s);
@@ -304,6 +305,35 @@ function startEvent() {
 }
 el('btnStart').onclick = startEvent;
 el('btnStartHere').onclick = startEvent;
+
+/* ── 還原點 ───────────────────────────────────────────
+   會清掉東西的動作，動手之前先存一份。兩段確認擋不住
+   「我以為我按的是別顆」，而現場那一下就是整場的成績。 */
+function markUndo(what) {
+  S.saveUndo(JSON.parse(JSON.stringify(store.get())), what);
+  paintUndo();
+}
+function paintUndo() {
+  var u = S.loadUndo();
+  el('undoBar').hidden = !u;
+  if (u) {
+    var mins = Math.round((Date.now() - u.at) / 60000);
+    el('undoWhat').textContent = u.what +
+      (mins < 1 ? '（剛剛）' : '（' + mins + ' 分鐘前）');
+  }
+}
+el('btnUndo').onclick = function () {
+  var u = S.loadUndo();
+  if (!u) return;
+  if (!confirmOnce('undo', '會回到「' + u.what + '」之前的狀態，之後做的都不算 —— 再按一次確定')) return;
+  /* 還原本身也要能反悔：把現在這份存成新的還原點 */
+  var now = JSON.parse(JSON.stringify(store.get()));
+  store.replace(u.state);
+  drafting = null;
+  S.saveUndo(now, '還原');
+  paintUndo();
+  toast('已回到「' + u.what + '」之前。再按一次「還原上一步」可以回到剛才');
+};
 
 /* 需要按兩次的動作，統一用這個 */
 var armed = {};
@@ -365,6 +395,7 @@ el('btnRepair').onclick = function () {
   var r = currentRound(st);
   if (r === null) return;
   if (!confirmOnce('repair', '重排會清掉' + roundLabel(r) + '已經回報的勝負 —— 再按一次確定')) return;
+  markUndo('重排' + roundLabel(r));
   store.commit(function (s) {
     s.matches = s.matches.filter(function (m) { return m.round !== r; });
   });
@@ -450,6 +481,7 @@ el('fileImport').onchange = function (e) {
   rd.onload = function () {
     try {
       var next = S.fromJSON(rd.result);
+      markUndo('匯入存檔');
       store.replace(next);
       drafting = null;
       toast('已匯入 ' + (next.event.name || '存檔'));
@@ -460,6 +492,7 @@ el('fileImport').onchange = function (e) {
 };
 el('btnReset').onclick = function () {
   if (!confirmOnce('reset', '會刪掉名單與所有勝負，回到空白 —— 再按一次確定')) return;
+  markUndo('全部清除重來');
   store.reset(); drafting = null;
   toast('已全部清除');
   goTab('tSetup');
@@ -470,6 +503,10 @@ el('btnReset').onclick = function () {
    換行用 CRLF（Windows 的 Excel 才不會擠成一行）。 */
 function csvCell(s) {
   s = String(s === null || s === undefined ? '' : s);
+  /* 以 = + - @ 開頭的字會被 Excel 當成公式執行 —— 有人取名叫「=1+1」
+     不是惡意也會壞掉，真的有心的話那是一條注入路徑。
+     前面補一個單引號，Excel 就當純文字，顯示出來還是原本的字。 */
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 function downloadCSV(rows, suffix) {
@@ -1354,6 +1391,20 @@ store.subscribe(function (st, remote) {
   if (booted && !remote && !applyingRemote && net.role === 'host') net.pushState(st);
   booted = true;
 });
+
+/* 版本號。使用者回報問題時，第一件要問的就是「你在哪一版」——
+   版本章本來就蓋在每個 script 的網址上，直接讀回來就好，不必另外維護一份。 */
+function appVersion() {
+  var s = document.querySelector('script[src*="ui.js"]');
+  var m = s && s.src.match(/[?&]v=(\d+)/);
+  if (!m) return '開發版';
+  var v = m[1];
+  return v.slice(0, 4) + '-' + v.slice(4, 6) + '-' + v.slice(6, 8) + ' ' +
+         v.slice(8, 10) + ':' + v.slice(10, 12);
+}
+el('appVer').textContent = appVersion();
+el('bookVer').textContent = appVersion();
+paintUndo();
 
 /* Service Worker 抓到新版時由 index.html 呼叫進來。
    刻意不自動重整、也不擋畫面 —— 現場最不需要的就是比賽跑到一半被打斷。 */
