@@ -177,5 +177,51 @@ head('【10】品牌字串一致，沒有改到一半的殘留');
   console.log('  四個檔案的全稱一致，沒有殘留 ✓');
 }
 
+/* ── 11 ────────────────────────────────────────────── */
+head('【11】文字對比度（WCAG AA 4.5:1）');
+{
+  const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  const ratio = (f, b) => {
+    const a = Math.max(lum(f), lum(b)), c = Math.min(lum(f), lum(b));
+    return (a + 0.05) / (c + 0.05);
+  };
+  const hex = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+  const over = (f, a, b) => f.map((v, i) => Math.round(a * v + (1 - a) * b[i]));
+
+  /* 從 CSS 直接讀 token，不要在測試裡另外抄一份數值 —— 抄的那份遲早會走鐘 */
+  const grab = (block, name) => {
+    const i = css.indexOf(block);
+    const seg = css.slice(i, css.indexOf('}', i));
+    const m = seg.match(new RegExp('--' + name + ':\\s*([^;]+);'));
+    return m ? m[1].trim() : null;
+  };
+  const parse = v => {
+    let m = v.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+    if (m) return { rgb: [+m[1], +m[2], +m[3]], a: parseFloat(m[4]) };
+    m = v.match(/#([0-9A-Fa-f]{6})/);
+    return m ? { rgb: hex('#' + m[1]), a: 1 } : null;
+  };
+
+  /* 內文級距的文字色，各自疊在自己主題的 surface 上 */
+  const checks = [
+    ['深色 --dim', ':root {', 'dim', ':root {', 'surface'],
+    ['深色 --faint', ':root {', 'faint', ':root {', 'surface'],
+    ['深色 --label-fg', ':root {', 'label-fg', ':root {', 'surface'],
+    ['淺色 --dim', '[data-theme="light"]', 'dim', '[data-theme="light"]', 'surface'],
+    ['淺色 --faint', '[data-theme="light"]', 'faint', '[data-theme="light"]', 'surface'],
+    ['淺色 --label-fg', '[data-theme="light"]', 'label-fg', '[data-theme="light"]', 'surface']
+  ];
+  let worst = 99;
+  checks.forEach(([label, fb, fn, bb, bn]) => {
+    const f = parse(grab(fb, fn)), b = parse(grab(bb, bn));
+    if (!f || !b) { ok(false, label + ' 讀不到 token'); return; }
+    const r = ratio(f.a < 1 ? over(f.rgb, f.a, b.rgb) : f.rgb, b.rgb);
+    worst = Math.min(worst, r);
+    ok(r >= 4.5, label + ' 只有 ' + r.toFixed(2) + ':1，低於 AA 的 4.5:1');
+  });
+  console.log('  六個內文色都過 AA，最低 ' + worst.toFixed(2) + ':1 ✓');
+}
+
 console.log(fails ? '\n有 ' + fails + ' 項沒過 ❌' : '\n全部通過 ✅');
 process.exit(fails ? 1 : 0);

@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608161643">
+<link rel="stylesheet" href="src/style.css?v=202608161646">
 </head>
 <body>
 
@@ -589,13 +589,15 @@
   </div></div>
 </div>
 
-<div id="toast"></div>
+<!-- role=status 讓螢幕閱讀器唸得到提示。用 status 而不是 alert：
+     alert 會打斷正在唸的內容，而這裡多半是「已複製」這種順帶告知。 -->
+<div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608161643"></script>
-<script src="src/engine.js?v=202608161643"></script>
-<script src="src/store.js?v=202608161643"></script>
-<script src="src/net.js?v=202608161643"></script>
-<script src="src/ui.js?v=202608161643"></script>
+<script src="src/qr.js?v=202608161646"></script>
+<script src="src/engine.js?v=202608161646"></script>
+<script src="src/store.js?v=202608161646"></script>
+<script src="src/net.js?v=202608161646"></script>
+<script src="src/ui.js?v=202608161646"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -603,7 +605,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608161643').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608161646').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {
