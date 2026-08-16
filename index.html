@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0B0D12">
 <title>NICEPLAY · 連線整合賽事次世代系統</title>
-<meta name="description" content="NICEPLAY — Networked Integrated Competition &amp; Event Platform for League And Yomi。開源的離線賽事系統：瑞士制、單敗淘汰、循環賽，一臺筆電就能辦一場比賽。">
+<meta name="description" content="NICEPLAY — Networked Integrated Competition &amp; Event Platform for League And You。開源的離線賽事系統：瑞士制、單敗淘汰、循環賽，一臺筆電就能辦一場比賽。">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-title" content="NICEPLAY">
 <meta property="og:type" content="website">
@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608161609">
+<link rel="stylesheet" href="src/style.css?v=202608161611">
 </head>
 <body>
 
@@ -372,7 +372,7 @@
       <span><b>N</b>etworked　連線</span><span><b>I</b>ntegrated　整合</span>
       <span><b>C</b>ompetition　競技</span><span><b>E</b>vent　賽事</span>
       <span><b>P</b>latform　平臺</span><span><b>L</b>eague　聯賽</span>
-      <span><b>A</b>nd　與</span><span><b>Y</b>omi　讀心</span>
+      <span><b>A</b>nd　與</span><span><b>Y</b>ou　你</span>
     </div>
   </div>
 
@@ -532,11 +532,11 @@
 
 <div id="toast"></div>
 
-<script src="src/qr.js?v=202608161609"></script>
-<script src="src/engine.js?v=202608161609"></script>
-<script src="src/store.js?v=202608161609"></script>
-<script src="src/net.js?v=202608161609"></script>
-<script src="src/ui.js?v=202608161609"></script>
+<script src="src/qr.js?v=202608161611"></script>
+<script src="src/engine.js?v=202608161611"></script>
+<script src="src/store.js?v=202608161611"></script>
+<script src="src/net.js?v=202608161611"></script>
+<script src="src/ui.js?v=202608161611"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -544,7 +544,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608161609').catch(function () {});
+    navigator.serviceWorker.register('sw.js?v=202608161611').catch(function () {});
   });
 }
 </script>

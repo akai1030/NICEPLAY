@@ -1,7 +1,7 @@
 {
   "name": "NICEPLAY 連線整合賽事次世代系統",
   "short_name": "NICEPLAY",
-  "description": "Networked Integrated Competition & Event Platform for League And Yomi — 離線可用的賽事系統，瑞士制、單敗淘汰、循環賽。",
+  "description": "Networked Integrated Competition & Event Platform for League And You — 離線可用的賽事系統，瑞士制、單敗淘汰、循環賽。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

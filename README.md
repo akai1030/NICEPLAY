@@ -1,6 +1,6 @@
 # 連線整合賽事次世代系統
 
-**NICEPLAY** — Networked Integrated Competition & Event Platform for League And Yomi
+**NICEPLAY** — Networked Integrated Competition & Event Platform for League And You
 
 實體賽事的現場工具。瑞士制配對、即時名次、投影畫面。純前端，離線可用。
 

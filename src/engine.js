@@ -1,6 +1,6 @@
 /* ============================================================
    NICEPLAY · 賽制引擎
-   Networked Integrated Competition & Event Platform for League And Yomi
+   Networked Integrated Competition & Event Platform for League And You
    ------------------------------------------------------------
    這個檔只做「算」，不碰畫面、不碰儲存、不碰網路，所以可以單獨測。
    瀏覽器與 Node 都能用。
