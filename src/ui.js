@@ -635,6 +635,62 @@ el('btnExport').onclick = function () {
   setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   toast('已匯出 ' + a.download);
 };
+/* ── 自動存檔 ─────────────────────────────────────────
+   「一步還原」擋得住誤按，擋不住瀏覽器資料被清掉或整臺當機。
+   選一個資料夾，之後每次換輪、每次回報就自己寫一份 JSON 進去。
+
+   File System Access API 只有 Chrome / Edge 有，Safari 沒有 ——
+   沒有的時候整顆按鈕就不出現，而不是按了才說做不到。
+   授權不能保存到下次開啟（瀏覽器的規定），所以每場開始要按一次；
+   按鈕文字直接寫「開啟」而不是「設定」，暗示它是每場的動作。 */
+var autoDir = null, autoTimer = null, autoLast = '';
+
+function autoSupported() { return typeof window.showDirectoryPicker === 'function'; }
+
+function paintAuto() {
+  el('autoRow').hidden = !autoSupported();
+  el('btnAutoSave').textContent = autoDir ? '停止自動存檔' : '開啟自動存檔';
+  el('btnAutoSave').classList.toggle('on', !!autoDir);
+  el('autoMsg').innerHTML = autoDir
+    ? '<span class="ok">每次變動都會寫進「' + esc(autoDir.name) + '」</span>'
+    : '選一個資料夾，之後每次變動就自己存一份。瀏覽器資料被清掉也救得回來。';
+}
+
+el('btnAutoSave').onclick = function () {
+  if (autoDir) {
+    autoDir = null; clearTimeout(autoTimer); paintAuto();
+    toast('已停止自動存檔');
+    return;
+  }
+  window.showDirectoryPicker({ mode: 'readwrite' }).then(function (dir) {
+    autoDir = dir;
+    paintAuto();
+    autoWrite(true);
+    toast('自動存檔已開啟 —— 存到「' + dir.name + '」');
+  }).catch(function () { /* 使用者自己取消，不用講話 */ });
+};
+
+/* 節流：現場一輪會有幾十次回報，每一次都寫檔沒有意義。
+   兩秒內的連續變動只寫最後一次。 */
+function autoWrite(now) {
+  if (!autoDir) return;
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(function () {
+    var st = store.get();
+    var text = S.toJSON(st);
+    if (text === autoLast) return;               /* 沒變就不要一直寫 */
+    var name = fileStem(st) + '.json';
+    autoDir.getFileHandle(name, { create: true })
+      .then(function (fh) { return fh.createWritable(); })
+      .then(function (w) { return w.write(text).then(function () { return w.close(); }); })
+      .then(function () { autoLast = text; })
+      .catch(function (e) {
+        autoDir = null; paintAuto();
+        toast('自動存檔中斷了：' + (e && e.message || '') + ' —— 請重新開啟', true);
+      });
+  }, now ? 0 : 2000);
+}
+
 el('btnImport').onclick = function () { el('fileImport').click(); };
 el('fileImport').onchange = function (e) {
   var f = e.target.files[0]; if (!f) return;
@@ -989,6 +1045,13 @@ function paintWatch(st) {
       : '';
   }
 
+  /* 成績單只在真的有成績之後才出現 —— 還沒打就給一張空的沒有意義 */
+  var played = me && st.matches.some(function (m) {
+    return (m.a === meId || m.b === meId) && m.result;
+  });
+  el('wtCardSec').hidden = !played;
+  if (played) { try { drawCard(st, me); } catch (e) { el('wtCardSec').hidden = true; } }
+
   /* 我的每一輪：打過誰、幾比幾。輪空也要列出來，不然選手會以為漏了一輪。 */
   var mine = me ? st.matches.filter(function (m) { return m.a === meId || m.b === meId; }) : [];
   el('wtMineSec').hidden = !mine.length;
@@ -1047,6 +1110,129 @@ function paintWatch(st) {
       '</div>';
   }).join('') : '<div class="hint">還沒有成績。</div>';
 }
+
+/* ── 賽後成績單 ───────────────────────────────────────
+   選手會自己轉發的東西 —— 對店家等於免費宣傳，所以主辦單位要在上面。
+   用 Canvas 畫而不是截圖：截圖會把手機的狀態列、瀏覽器網址列一起帶進去，
+   而且每支手機的比例都不一樣。這裡固定 1080×1350（IG 直式），
+   誰的手機畫出來都一樣。 */
+function drawCard(st, me) {
+  var cv = el('wtCard'), g = cv.getContext('2d');
+  var W = cv.width, H = cv.height;
+  var dark = st.theme !== 'light';
+  var bg = dark ? '#0B0D12' : '#FFFFFF';
+  var fg = dark ? '#FFFFFF' : '#0B0D12';
+  var dim = dark ? 'rgba(255,255,255,.62)' : 'rgba(11,13,18,.62)';
+  var line = dark ? 'rgba(255,255,255,.16)' : 'rgba(11,13,18,.14)';
+  var CN = '"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
+  var MO = '"SF Mono",Menlo,Consolas,monospace';
+
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+
+  /* 頂部品牌漸層條 —— 全站唯一用漸層的地方，成績單也照這條規矩 */
+  var grad = g.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, '#2563FF'); grad.addColorStop(.52, '#A855F7');
+  grad.addColorStop(1, '#FF2ED1');
+  g.fillStyle = grad; g.fillRect(0, 0, W, 16);
+
+  var rows = E.standings(st.players, st.matches, st.config.rules);
+  var mine = null;
+  rows.forEach(function (r) { if (r.id === me.id) mine = r; });
+  if (!mine) return;
+
+  var y = 120;
+  g.textAlign = 'left';
+  g.fillStyle = dim; g.font = '34px ' + CN;
+  g.fillText([st.event.host, st.event.name].filter(Boolean).join('　·　') || 'NICEPLAY', 80, y);
+  y += 54;
+  g.fillStyle = dim; g.font = '30px ' + MO;
+  g.fillText(st.event.date || '', 80, y);
+
+  /* 名次：整張圖最大的一個數字 */
+  y += 170;
+  g.fillStyle = fg; g.font = '900 220px ' + MO;
+  g.fillText(String(mine.rank), 80, y);
+  var w = g.measureText(String(mine.rank)).width;
+  g.fillStyle = dim; g.font = '44px ' + CN;
+  g.fillText('名', 80 + w + 20, y);
+
+  y += 90;
+  g.fillStyle = fg; g.font = '900 76px ' + CN;
+  g.fillText(me.name, 80, y);
+  if (me.team) {
+    y += 52;
+    g.fillStyle = dim; g.font = '36px ' + CN;
+    g.fillText(me.team, 80, y);
+  }
+
+  y += 80;
+  g.strokeStyle = line; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(80, y); g.lineTo(W - 80, y); g.stroke();
+
+  /* 三個數字並排 */
+  y += 100;
+  var stats = [
+    [mine.w + '-' + mine.l + (mine.d ? '-' + mine.d : ''), '戰績'],
+    [String(mine.pts), '積分'],
+    [(mine.omw * 100).toFixed(1), 'OMW%']
+  ];
+  stats.forEach(function (s, i) {
+    var x = 80 + i * ((W - 160) / 3);
+    g.fillStyle = fg; g.font = '700 68px ' + MO;
+    g.fillText(s[0], x, y);
+    g.fillStyle = dim; g.font = '30px ' + CN;
+    g.fillText(s[1], x, y + 44);
+  });
+
+  /* 每一輪打了誰 */
+  y += 130;
+  g.fillStyle = dim; g.font = '30px ' + MO;
+  g.fillText('EVERY ROUND', 80, y);
+  y += 20;
+  var mineMs = st.matches.filter(function (m) { return m.a === me.id || m.b === me.id; });
+  mineMs.slice(0, 9).forEach(function (m) {
+    y += 62;
+    var bye = (m.b === null || m.b === undefined);
+    var iAmA = (m.a === me.id);
+    var opp = bye ? '—' : nameOf(st, iAmA ? m.b : m.a);
+    var gm = E.tallyGames(E.gamesOf(m));
+    var tag = bye ? (m.result === 'noshow' ? '未到' : '輪空')
+            : !m.result ? '進行中'
+            : m.result === 'draw' ? '平手'
+            : (((m.result === 'a') === iAmA) ? '勝' : '敗');
+    g.fillStyle = dim; g.font = '34px ' + MO;
+    g.fillText(String(roundLabel(m.round)), 80, y);
+    g.fillStyle = fg; g.font = '38px ' + CN;
+    g.fillText(opp, 260, y);
+    g.textAlign = 'right';
+    if (!bye && (m.bo || 1) > 1) {
+      g.fillStyle = dim; g.font = '32px ' + MO;
+      g.fillText(iAmA ? gm.a + '-' + gm.b : gm.b + '-' + gm.a, W - 200, y);
+    }
+    g.fillStyle = (tag === '勝') ? '#FF2ED1' : dim;
+    g.font = '700 36px ' + CN;
+    g.fillText(tag, W - 80, y);
+    g.textAlign = 'left';
+  });
+
+  g.fillStyle = dim; g.font = '28px ' + MO;
+  g.fillText('NICEPLAY · niceplay.transtation.org', 80, H - 60);
+}
+
+el('btnWtCard').onclick = function () {
+  var cv = el('wtCard'), st = store.get();
+  try {
+    cv.toBlob(function (blob) {
+      if (!blob) { toast('這支瀏覽器存不了圖，長按上面那張圖也可以存', true); return; }
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fileStem(st) + '_成績單.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      toast('已存成圖片');
+    }, 'image/png');
+  } catch (e) { toast('存不了圖，長按上面那張圖也可以存', true); }
+};
 
 el('meList').addEventListener('click', function (e) {
   var d = e.target.closest('.nm'); if (!d) return;
@@ -1282,12 +1468,14 @@ addEventListener('keydown', function (e) {
   if (e.key === 'Escape') return;
   if (e.key === '1') { pvMode = 'matches'; render(store.get()); }
   if (e.key === '2') { pvMode = 'rank'; render(store.get()); }
+  if (e.key === '3') { pvMode = 'plan'; render(store.get()); }
   if (e.key === 'f' || e.key === 'F') el('btnFull').onclick();
 });
 
 /* 點畫面中央切換「對戰表 ⇄ 名次」，點頁尾的按鈕不算 */
 el('pvBody').addEventListener('click', function () {
-  pvMode = (pvMode === 'matches') ? 'rank' : 'matches';
+  var cycle = ['matches', 'rank', 'plan'];
+  pvMode = cycle[(cycle.indexOf(pvMode) + 1) % cycle.length];
   render(store.get());
 });
 
@@ -1545,8 +1733,63 @@ function paintPresent(st) {
     : (roundLabel(r) + '　已回報 ' + done + '/' + playable.length +
        (done < playable.length ? '　·　尚有 ' + (playable.length - done) + ' 桌未回報' : '　·　全部回報完畢'));
 
-  if (pvMode === 'rank' || r === null) paintPvRank(st);
+  if (pvMode === 'plan') paintPvPlan(st, r);
+  else if (pvMode === 'rank' || r === null) paintPvRank(st);
   else paintPvMatches(st, ms);
+}
+
+/* ── 投影：賽程總覽 ───────────────────────────────────
+   選手第三常問的是「還要打多久」。開場與換輪的空檔投這一頁，
+   等於自動回答，主辦不用一直被同一句話打斷。
+
+   預計結束時間是「參考值」不是「狀態」—— 換輪永遠是主辦按下去才發生，
+   這個數字不會去推動任何東西，只是照現在的設定算給大家看。
+   所以標題直接寫「預計」，而且時間到了也不會自己往下跑。 */
+function paintPvPlan(st, r) {
+  var cfg = st.config;
+  var total = cfg.format === 'swiss' ? cfg.rounds : 0;
+  var doneR = E.countRounds(st.matches);
+  var nowR = (typeof r === 'number') ? r : doneR;
+  var left = total ? Math.max(0, total - nowR) : 0;
+  var alivePlayers = st.players.filter(function (p) { return !p.dropped; }).length;
+
+  var mins = cfg.minutes || 0;
+  var remainNow = Math.max(0, Math.ceil(remainMs(st) / 60000));
+  var eta = '';
+  if (mins && total) {
+    /* 這一輪剩下的 + 之後每一輪，各多留五分鐘給回報與換位 */
+    var totalMin = remainNow + left * (mins + 5);
+    var d = new Date(Date.now() + totalMin * 60000);
+    eta = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  var cells = [
+    ['ROUND', total ? nowR + ' / ' + total : String(nowR || '—'), total ? '第幾輪' : '輪次'],
+    ['PLAYERS', String(alivePlayers), '目前人數'],
+    ['CLOCK', mins ? mins + ' 分' : '不計時', '每輪時間'],
+    ['ETA', eta || '—', eta ? '預計結束（參考）' : '未設定時間']
+  ];
+
+  var url = roomViewURL(st);
+  var h = '<div class="pv-plan">' +
+    '<div class="pv-plan-hd">' +
+      '<b>' + esc(st.event.name || 'NICEPLAY') + '</b>' +
+      (st.event.host ? '<span>主辦　' + esc(st.event.host) + '</span>' : '') +
+      '<em>' + esc(formatLabel(cfg)) + '</em>' +
+    '</div>' +
+    '<div class="pv-plan-grid">' +
+      cells.map(function (c) {
+        return '<div class="pv-cell"><i>' + c[0] + '</i><b>' + esc(c[1]) +
+               '</b><span>' + esc(c[2]) + '</span></div>';
+      }).join('') +
+    '</div>';
+
+  if (url) {
+    h += '<div class="pv-plan-qr"><div class="pv-plan-qrimg">' + qrSVG(url, 420) + '</div>' +
+         '<div class="pv-plan-qrcap"><b>掃我查自己的桌號與名次</b>' +
+         '<span>不用註冊、不用安裝，掃了就看得到</span></div></div>';
+  }
+  el('pvBody').innerHTML = h + '</div>';
 }
 
 function paintPvMatches(st, ms) {
@@ -1731,6 +1974,7 @@ store.subscribe(function (st, remote) {
        這時候推出去的是它自己還沒載入的空白狀態，等於把房間洗掉。
        房間本來就是用開房當下那份狀態建的，開場不需要再推一次。 */
   if (booted && !remote && !applyingRemote && net.role === 'host') net.pushState(st);
+  if (booted) autoWrite();          /* 有開自動存檔就順手寫一份 */
   booted = true;
 });
 
@@ -1747,6 +1991,7 @@ function appVersion() {
 el('appVer').textContent = appVersion();
 el('bookVer').textContent = appVersion();
 paintUndo();
+paintAuto();
 
 /* Service Worker 抓到新版時由 index.html 呼叫進來。
    刻意不自動重整、也不擋畫面 —— 現場最不需要的就是比賽跑到一半被打斷。 */

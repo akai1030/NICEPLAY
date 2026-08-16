@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608162352">
+<link rel="stylesheet" href="src/style.css?v=202608162357">
 </head>
 <body>
 
@@ -249,6 +249,11 @@
     <button class="sm" id="btnImport">匯入存檔</button>
     <input type="file" id="fileImport" accept="application/json" hidden>
   </div>
+  <!-- 自動存檔。瀏覽器資料被清、整臺當機，一步還原也救不回來。 -->
+  <div class="row" id="autoRow">
+    <button class="sm" id="btnAutoSave">開啟自動存檔</button>
+    <span class="hint" id="autoMsg" style="flex:1 1 200px;margin:0"></span>
+  </div>
 
   <!-- 一步還原。只在真的有東西可以還原的時候出現 —— 平常不該佔位子。 -->
   <div class="row" id="undoBar" hidden>
@@ -406,6 +411,13 @@
       <div id="wtMatches"></div>
     </div>
 
+    <div class="wt-sec" id="wtCardSec" hidden>
+      <h3>我的成績單</h3>
+      <canvas id="wtCard" width="1080" height="1350"></canvas>
+      <button class="sm main" id="btnWtCard" style="width:100%;margin-top:10px">
+        存成圖片　可以直接發到群組</button>
+    </div>
+
     <div class="wt-sec">
       <h3>即時名次</h3>
       <div id="wtRank"></div>
@@ -443,7 +455,7 @@
     <span class="k"><span class="lk"><i class="mk"></i><i class="wm"></i></span>
       <em>連線整合賽事次世代系統</em></span>
     <span class="grow" id="pvFoot"></span>
-    <span class="exit">點畫面切換對戰表／名次　·　1 對戰表　2 名次　F 全螢幕　Esc 離開全螢幕</span>
+    <span class="exit">點畫面輪流切換　·　1 對戰表　2 名次　3 賽程總覽　F 全螢幕　Esc 離開全螢幕</span>
     <button class="sm" id="btnFull">全螢幕</button>
     <button class="sm" id="btnClosePv">關閉投影窗</button>
     <!-- 投影上的 QR 只有一枚郵票大，坐後排的掃不到 —— 點一下放大到滿版 -->
@@ -680,11 +692,11 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608162352"></script>
-<script src="src/engine.js?v=202608162352"></script>
-<script src="src/store.js?v=202608162352"></script>
-<script src="src/net.js?v=202608162352"></script>
-<script src="src/ui.js?v=202608162352"></script>
+<script src="src/qr.js?v=202608162357"></script>
+<script src="src/engine.js?v=202608162357"></script>
+<script src="src/store.js?v=202608162357"></script>
+<script src="src/net.js?v=202608162357"></script>
+<script src="src/ui.js?v=202608162357"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -692,7 +704,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608162352').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608162357').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {

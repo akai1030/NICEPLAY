@@ -517,6 +517,11 @@ body.player #btnBook { display: none !important; }
 /* BO 制時中間那格從 VS 換成目前局數 —— 選手想知道的是還差幾局 */
 .wr .x.sc { font-family: var(--f-mono); font-size: 14px; font-weight: 700; color: var(--fg); }
 /* 我的每一輪：贏的那幾列用桃紅左邊條，輸的淡掉 —— 一眼掃得出戰績走勢 */
+/* 成績單畫在 1080×1350 的畫布上（IG 直式），顯示時等比縮到欄寬 ——
+   每支手機存出來的圖都一樣，不會因為螢幕比例不同而變形。 */
+#wtCard { width: 100%; height: auto; display: block; border-radius: var(--r);
+          border: 1px solid var(--line); }
+
 .wr.won { box-shadow: inset 3px 0 0 var(--lime); }
 .wr.lost { opacity: .6; }
 .wr .s.sc { font-family: var(--f-mono); color: var(--fg); }
@@ -684,6 +689,35 @@ body.present #present { display: flex; }
 .pv-rk.top4 b { color: var(--gold); }
 .pv-rk.out { opacity: .35; }
 .pv-rk.out span { text-decoration: line-through; }
+
+/* ── 投影：賽程總覽 ───────────────────────────────────
+   開場與換輪的空檔投這一頁。四格數字要遠遠就讀得到，
+   所以全部走 vw、等寬體、tabular-nums。 */
+.pv-plan { height: 100%; display: flex; flex-direction: column; gap: 2vw;
+           justify-content: center; }
+.pv-plan-hd { display: flex; flex-direction: column; gap: .5vw; }
+.pv-plan-hd b { font-size: 4.6vw; font-weight: 900; line-height: 1.05; }
+.pv-plan-hd span { font-size: 1.5vw; color: var(--dim); }
+.pv-plan-hd em { font-style: normal; font-family: var(--f-mono); font-size: 1.3vw;
+                 color: var(--accent-fg); letter-spacing: .06em; }
+.pv-plan-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2vw; }
+.pv-cell { background: var(--surface); border: 1px solid var(--line);
+           border-radius: .8vw; padding: 1.2vw 1.4vw;
+           display: flex; flex-direction: column; gap: .3vw; min-width: 0; }
+.pv-cell i { font-style: normal; font-family: var(--f-mono); font-size: .95vw;
+             letter-spacing: .18em; color: var(--label-fg); }
+.pv-cell b { font-family: var(--f-mono); font-size: 4vw; font-weight: 700;
+             line-height: 1; letter-spacing: -.02em;
+             font-variant-numeric: tabular-nums; }
+.pv-cell span { font-size: 1.15vw; color: var(--dim); }
+.pv-plan-qr { display: flex; align-items: center; gap: 1.6vw;
+              background: #FFF; border-radius: 1vw; padding: 1.2vw 1.8vw;
+              align-self: flex-start; }
+.pv-plan-qrimg { width: 11vw; height: 11vw; flex: 0 0 auto; }
+.pv-plan-qrimg svg { width: 100%; height: 100%; display: block; }
+.pv-plan-qrcap { display: flex; flex-direction: column; gap: .4vw; color: #0B0D12; }
+.pv-plan-qrcap b { font-size: 2vw; font-weight: 900; }
+.pv-plan-qrcap span { font-size: 1.2vw; color: #444; }
 
 /* ── 使用手冊 ───────────────────────────────────────── */
 
