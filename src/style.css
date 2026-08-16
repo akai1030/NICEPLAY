@@ -881,6 +881,21 @@ body.present #btnBook { display: none; }
 }
 
 /* ── 列印：名次表直接印或存 PDF ───────────────────────── */
+/* ── 手動換位 ─────────────────────────────────────────
+   進入換位模式時，整排對戰卡改成「選人」的樣子：虛線邊框提示
+   「現在點下去不是回報勝負」，選中的那個亮起來。 */
+.swapbar { flex: 1 1 100%; margin: 6px 0 0; padding: 10px 12px;
+           border: 2px dashed var(--gold); border-radius: var(--r);
+           background: var(--surface); }
+button.sm.on { background: var(--gold); border-color: var(--gold);
+               color: var(--black); font-weight: 900; }
+body.swapping #matchList .sd { border-style: dashed; cursor: copy; }
+body.swapping #matchList .dw { opacity: .3; pointer-events: none; }
+body.swapping #matchList .undo { display: none; }
+body.swapping #matchList .sd.picked {
+  border-style: solid; border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-dim); }
+
 /* ── 工具列（搜尋／排序／印桌卡）───────────────────── */
 .tools { align-items: flex-end; gap: 10px; }
 .find { flex: 1 1 200px; min-width: 0; }

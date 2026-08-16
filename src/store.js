@@ -47,7 +47,8 @@ function blank() {
       customTables: [],
       rules: { win: 3, draw: 1, loss: 0, minWinPct: 0.25 },
       liveTable: '',            /* 直播／主桌，空字串 = 沒有 */
-      sound: true               /* 時間到的提示音。主辦常常沒在看螢幕 */
+      sound: true,              /* 時間到的提示音。主辦常常沒在看螢幕 */
+      lateJoin: 'loss'          /* 中途加入的人前面幾輪：loss | bye | none */
     },
     players: [],
     matches: [],
@@ -197,10 +198,19 @@ function parsePlayers(text) {
     var m = s.match(/^(\d{1,3})[\s.,、:：)\]）】．。，；;]+(.+)$/);
     var name = (m ? m[2] : s).trim();
     if (!name) return;
+
+    /* 隊伍／店家：名字後面加 @桌遊記 或（桌遊記）都算。
+       填了之後瑞士制會盡量避開同隊內戰 —— 大家大老遠來，
+       第一輪就打到隊友是最沒意思的一種配對。 */
+    var team = '';
+    var tm = name.match(/^(.*?)[\s]*[@＠]\s*(.+)$/) ||
+             name.match(/^(.*?)[\s]*[（(]\s*([^）)]+)[）)]\s*$/);
+    if (tm && tm[1].trim()) { name = tm[1].trim(); team = tm[2].trim(); }
+
     var k = name.toLowerCase();
     if (seen[k]) return;                            /* 同名只留一個 */
     seen[k] = 1;
-    out.push({ id: uid(), no: out.length + 1, name: name, dropped: false });
+    out.push({ id: uid(), no: out.length + 1, name: name, team: team, dropped: false });
   });
   return out;
 }

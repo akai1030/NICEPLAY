@@ -174,6 +174,7 @@ function fillForm(st) {
   el('fLoss').value = st.config.rules.loss;
   el('fMinutes').value = st.config.minutes;
   el('fSound').value = (st.config.sound === false) ? '0' : '1';
+  el('fLate').value = st.config.lateJoin || 'loss';
   syncFormatFields();
 }
 
@@ -196,6 +197,7 @@ function readForm(st) {
   st.config.rules.loss = parseInt(el('fLoss').value, 10);
   st.config.minutes = Math.max(0, parseInt(el('fMinutes').value, 10) || 0);
   st.config.sound = el('fSound').value !== '0';
+  st.config.lateJoin = el('fLate').value;
 }
 
 /* 賽制不同，該問的東西也不同 —— 不相關的欄位直接收起來 */
@@ -253,7 +255,10 @@ function syncPlayerBox(st) {
   var box = el('fPlayers');
   if (document.activeElement === box) return;      /* 正在打字就別動它 */
   var list = drafting || st.players;
-  box.value = list.map(function (p) { return p.no + ' ' + p.name; }).join('\n');
+  /* 寫回去的格式要跟讀得進來的一致，不然按第二次「更新名單」隊伍就掉了 */
+  box.value = list.map(function (p) {
+    return p.no + ' ' + p.name + (p.team ? ' @' + p.team : '');
+  }).join('\n');
 }
 
 el('btnParse').onclick = function () {
@@ -264,7 +269,7 @@ el('btnParse').onclick = function () {
   if (!st.matches.length) {
     /* 還沒開賽：整份取代，編號重排 */
     drafting = typed.map(function (p, i) {
-      return { id: p.id, no: i + 1, name: p.name, dropped: false };
+      return { id: p.id, no: i + 1, name: p.name, team: p.team || '', dropped: false };
     });
     paintRoster(drafting);
     syncPlayerBox(st);
@@ -278,7 +283,7 @@ el('btnParse').onclick = function () {
   var byName = {};
   st.players.forEach(function (p) { byName[p.name] = p; });
   var added = [], missing = [];
-  typed.forEach(function (p) { if (!byName[p.name]) added.push(p.name); });
+  typed.forEach(function (p) { if (!byName[p.name]) added.push(p); });
   var typedNames = {};
   typed.forEach(function (p) { typedNames[p.name] = 1; });
   st.players.forEach(function (p) { if (!typedNames[p.name]) missing.push(p.name); });
@@ -289,12 +294,34 @@ el('btnParse').onclick = function () {
     syncPlayerBox(st);
     return;
   }
+
+  /* 遲到的人前面幾輪怎麼算。不補的話他等於白拿一個很高的 OMW% ——
+     分母裡少了那幾場，同分時會排在有打滿的人前面，那不公平。
+     實務上通常記為敗，但這是主辦的決定，所以做成設定而不是寫死。 */
+  var past = E.countRounds(st.matches);
+  var mode = el('fLate').value;
+  var names = added.map(function (p) { return p.name; });
+
   store.commit(function (s) {
-    added.forEach(function (nm) {
-      s.players.push({ id: S.uid(), no: s.players.length + 1, name: nm, dropped: false });
+    added.forEach(function (p) {
+      var id = S.uid();
+      s.players.push({ id: id, no: s.players.length + 1, name: p.name,
+                       team: p.team || '', dropped: false });
+      if (mode === 'none' || !past) return;
+      for (var r = 1; r <= past; r++) {
+        s.matches.push({
+          round: r, table: mode === 'loss' ? '未到' : '輪空',
+          a: id, b: null, bo: 1, games: [],
+          result: mode === 'loss' ? 'noshow' : 'bye'
+        });
+      }
     });
   });
-  toast('已加入 ' + added.length + ' 位：' + added.join('、') +
+
+  var tail = (past && mode !== 'none')
+    ? '　前 ' + past + ' 輪各補記一' + (mode === 'loss' ? '敗' : '次輪空')
+    : '';
+  toast('已加入 ' + added.length + ' 位：' + names.join('、') + tail +
         (missing.length ? '（' + missing.join('、') + ' 未移除，請用退賽）' : ''));
 };
 
@@ -470,11 +497,78 @@ el('btnRepair').onclick = function () {
 };
 
 /* ── 回報勝負 ───────────────────────────────────────── */
+/* ── 手動換位 ─────────────────────────────────────────
+   幾乎每場都會遇到：兩個人是同店隊友、有人遲到要補進來、
+   某位選手需要固定靠門的桌。原本唯一的辦法是「重排這一輪」再賭一次，
+   賭不到就一直重排。
+
+   做成「點兩個人就交換」而不是拖曳 —— 現場常常是單手拿著手機或
+   一手還拿著紙條，拖曳在觸控上又特別容易放錯位置。 */
+var swapMode = false, swapFrom = null;
+
+el('btnSwap').onclick = function () {
+  var st = store.get();
+  if (currentRound(st) === null) { toast('還沒排對戰，沒有位子可以換', true); return; }
+  if (net.role === 'guest' || net.role === 'watch') {
+    toast('換位子要在主控那臺做', true); return;
+  }
+  swapMode = !swapMode; swapFrom = null;
+  paintSwap();
+  toast(swapMode ? '點兩個人就交換位子；再按一次「手動換位」結束'
+                 : '已結束手動換位');
+};
+
+function paintSwap() {
+  document.body.classList.toggle('swapping', swapMode);
+  el('swapBar').hidden = !swapMode;
+  el('btnSwap').classList.toggle('on', swapMode);
+  if (!swapMode) return;
+  var st = store.get();
+  el('swapPick').textContent = swapFrom
+    ? '已選：' + nameOf(st, swapFrom) + '　再點另一個人就交換'
+    : '還沒選人';
+  document.querySelectorAll('#matchList .sd').forEach(function (b) {
+    b.classList.toggle('picked', !!swapFrom && b.dataset.id === swapFrom);
+  });
+}
+
+/* 交換兩個人的位子。被動到的那兩桌一律清掉勝負 ——
+   對手變了，原本回報的結果就不算數，留著只會變成錯的成績。 */
+function doSwap(idA, idB) {
+  var st = store.get(), r = currentRound(st);
+  if (idA === idB) return;
+  store.commit(function (s) {
+    var touched = [];
+    s.matches.forEach(function (m) {
+      if (m.round !== r) return;
+      if (m.a === idA) { m.a = idB; touched.push(m); }
+      else if (m.a === idB) { m.a = idA; touched.push(m); }
+      if (m.b === idA) { m.b = idB; touched.push(m); }
+      else if (m.b === idB) { m.b = idA; touched.push(m); }
+    });
+    touched.forEach(function (m) {
+      if (m.b === null || m.b === undefined) { m.result = 'bye'; m.games = []; return; }
+      m.result = null; m.games = [];
+    });
+  });
+  toast('已交換 ' + nameOf(st, idA) + ' 與 ' + nameOf(st, idB) + '　那兩桌的勝負已清空');
+}
+
 el('matchList').addEventListener('click', function (e) {
   var u = e.target.closest('.undo');
   if (u) { reportGame(u.dataset.t, null); return; }
   var d = e.target.closest('.sd,.dw');
   if (!d || d.classList.contains('bye') || !d.dataset.t) return;
+
+  if (swapMode) {
+    if (!d.dataset.id) return;                 /* 平手那一格不是人 */
+    if (!swapFrom) { swapFrom = d.dataset.id; paintSwap(); return; }
+    var from = swapFrom;
+    swapFrom = null;
+    doSwap(from, d.dataset.id);
+    paintSwap();
+    return;
+  }
   reportGame(d.dataset.t, d.dataset.r);
 });
 
@@ -1378,7 +1472,7 @@ function side(st, m, which, rm, bo, g) {
   var label = '第 ' + m.table + ' 桌　' + nameOf(st, id) +
               ((bo || 1) > 1 ? '　記他贏一局' : '　記他贏');
   return '<button type="button" class="' + cls + '" data-t="' + esc(m.table) +
-         '" data-r="' + which + '" aria-pressed="' + won + '"' +
+         '" data-r="' + which + '" data-id="' + esc(id) + '" aria-pressed="' + won + '"' +
          ' aria-label="' + esc(label) + '">' +
          '<i>' + numOf(st, id) + '</i><span class="who">' + esc(nameOf(st, id)) + '</span>' +
          pipsOf(bo || 1, which === 'a' ? g.a : g.b) +

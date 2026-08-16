@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608162346">
+<link rel="stylesheet" href="src/style.css?v=202608162352">
 </head>
 <body>
 
@@ -73,7 +73,17 @@
   <div class="hint" style="margin-top:2px">
     這個框<b>永遠等於完整名單</b> —— 按下按鈕之後它會把整份名單重新寫回來，
     所以加人只要在最後補一行，原本的人不會不見。<br>
-    比賽開始後再按，<b>只會新增</b>，已經打完的成績不受影響；要移除某個人請用排名頁的「退賽」。
+    比賽開始後再按，<b>只會新增</b>，已經打完的成績不受影響；要移除某個人請用排名頁的「退賽」。<br>
+    名字後面加 <span class="key">@桌遊記</span> 或 <span class="key">（桌遊記）</span>
+    就是隊伍／店家，瑞士制會<b>盡量避開同隊內戰</b>。
+  </div>
+  <div class="row">
+    <label class="fld"><span>中途加入的人，前面幾輪算</span>
+      <select id="fLate">
+        <option value="loss">記為敗　最常見</option>
+        <option value="bye">記為輪空　視同勝</option>
+        <option value="none">不計　場次較少，OMW% 會偏高</option>
+      </select></label>
   </div>
   <div class="roster" id="rosterView" style="margin-top:10px"></div>
 
@@ -286,7 +296,14 @@
         <option value="table">依桌號　照紙條順序輸入</option>
       </select></label>
     <button class="sm" id="btnTents">列印桌卡</button>
+    <button class="sm" id="btnSwap">手動換位</button>
     <span class="hint findmsg" id="playFindMsg"></span>
+    <div class="hint swapbar" id="swapBar" hidden>
+      <b>手動換位中</b>　點兩個人就交換位子。同隊撞在一起、有人要換桌、
+      臨時併桌都用這個。<b>被換到的那兩桌會清掉已回報的勝負</b> ——
+      對手變了，原本的結果就不算數。<br>
+      <span id="swapPick">還沒選人</span>
+    </div>
   </div>
   <div id="matchList"></div>
   <!-- 現場的順序是：先開始計時，打完回報，最後才排下一輪。
@@ -663,11 +680,11 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608162346"></script>
-<script src="src/engine.js?v=202608162346"></script>
-<script src="src/store.js?v=202608162346"></script>
-<script src="src/net.js?v=202608162346"></script>
-<script src="src/ui.js?v=202608162346"></script>
+<script src="src/qr.js?v=202608162352"></script>
+<script src="src/engine.js?v=202608162352"></script>
+<script src="src/store.js?v=202608162352"></script>
+<script src="src/net.js?v=202608162352"></script>
+<script src="src/ui.js?v=202608162352"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -675,7 +692,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608162346').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608162352').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {
