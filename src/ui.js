@@ -126,6 +126,9 @@ function fillForm(st) {
   el('fFormat').value = st.config.format;
   el('fRounds').value = st.config.rounds;
   el('fCut').value = String(st.config.cut || 0);
+  /* 舊存檔沒有 bo / boKO —— 一律回到一勝制，不要替使用者改變已經在跑的賽事 */
+  el('fBo').value = String(st.config.bo || 1);
+  el('fBoKO').value = String(st.config.boKO || 1);
   el('fNaming').value = st.config.tableNaming;
   el('fTables').value = st.config.tableCount || '';
   el('fCustom').value = (st.config.customTables || []).join(', ');
@@ -143,6 +146,8 @@ function readForm(st) {
   st.config.format = el('fFormat').value;
   st.config.rounds = Math.max(1, parseInt(el('fRounds').value, 10) || 1);
   st.config.cut = parseInt(el('fCut').value, 10) || 0;
+  st.config.bo = parseInt(el('fBo').value, 10) || 1;
+  st.config.boKO = parseInt(el('fBoKO').value, 10) || 1;
   st.config.tableNaming = el('fNaming').value;
   st.config.tableCount = parseInt(el('fTables').value, 10) || 0;
   st.config.customTables = el('fCustom').value.split(/[,，]/)
@@ -160,7 +165,32 @@ function syncFormatFields() {
   el('wrapRounds').style.display = (f === 'swiss') ? '' : 'none';
   el('wrapCut').style.display = (f === 'swiss') ? '' : 'none';
   el('wrapCustom').style.display = (el('fNaming').value === 'custom') ? '' : 'none';
+
+  /* 純單敗淘汰沒有「常規賽」，瑞士制不接淘汰賽就沒有「淘汰賽」——
+     不相關的那個直接收起來，免得設了半天沒作用。 */
+  var hasNormal = (f !== 'single');
+  var hasKO = (f === 'single') || (f === 'swiss' && (parseInt(el('fCut').value, 10) || 0) >= 2);
+  el('wrapBo').style.display = hasNormal ? '' : 'none';
+  el('wrapBoKO').style.display = hasKO ? '' : 'none';
+  el('boHint').innerHTML = boHintText(hasNormal, hasKO);
   updateTableHint();
+}
+
+/* 幾勝制講清楚兩件現場一定會問的事：要贏幾局、平手怎麼算 */
+function boHintText(hasNormal, hasKO) {
+  var parts = [];
+  if (hasNormal) parts.push('常規賽 ' + boWord(parseInt(el('fBo').value, 10) || 1));
+  if (hasKO) parts.push('淘汰賽 ' + boWord(parseInt(el('fBoKO').value, 10) || 1));
+  if (!parts.length) return '';
+  return parts.join('　·　') + '<br>' +
+    '對戰卡上點誰贏，就記他一局；打滿還沒有人過半就算平手（BO2 的 1-1、BO3 的 1-1-1）。' +
+    '點錯用卡片右邊的「退一局」往回退。<b>每一場的幾勝制在排出來的當下就定了</b> —— ' +
+    '中途改設定只影響之後排的輪次，已經打完的不會被改寫。';
+}
+function boWord(bo) {
+  if (bo <= 1) return '<b>BO1</b>　一局定勝負';
+  return '<b>BO' + bo + '</b>　先贏 ' + E.winsNeeded(bo) + ' 局' +
+         (bo % 2 === 0 ? '，' + (bo / 2) + '-' + (bo / 2) + ' 算平手' : '');
 }
 
 function updateTableHint(st) {
@@ -328,23 +358,40 @@ el('btnRepair').onclick = function () {
 
 /* ── 回報勝負 ───────────────────────────────────────── */
 el('matchList').addEventListener('click', function (e) {
+  var u = e.target.closest('.undo');
+  if (u) { reportGame(u.dataset.t, null); return; }
   var d = e.target.closest('.sd,.dw');
   if (!d || d.classList.contains('bye') || !d.dataset.t) return;
-  var table = d.dataset.t, want = d.dataset.r;
-  var st = store.get(), r = currentRound(st);
+  reportGame(d.dataset.t, d.dataset.r);
+});
 
+/* want：'a' | 'b' | 'draw' 記一局，null 退一局。
+   規則一律問 engine.playGame —— 主控與副控走同一條，兩邊不會有分歧。 */
+function reportGame(table, want) {
+  var st = store.get(), r = currentRound(st);
   if (net.role === 'watch') { toast('查詢模式只能看，回報請找副控', true); return; }
+
+  var m = null;
+  matchesOf(st, r).forEach(function (x) { if (x.table === table) m = x; });
+  if (!m || m.b === null || m.b === undefined) return;
+
+  var next = E.playGame(m, want === null ? null : want);
+  if (!next) {
+    if (want !== null) toast('這一場已經分出勝負了 —— 要改請先按「退一局」', true);
+    return;
+  }
+
   if (net.role === 'guest') {
     /* 加入者不改本機，送給伺服器；伺服器套用完會把新狀態推回來 */
-    net.sendResult(r, table, want).catch(function () {});
+    net.sendMatch(r, table, next.games, next.result).catch(function () {});
     return;
   }
   store.commit(function (s) {
-    s.matches.forEach(function (m) {
-      if (m.round === r && m.table === table) m.result = (m.result === want) ? null : want;
+    s.matches.forEach(function (x) {
+      if (x.round === r && x.table === table) { x.games = next.games; x.result = next.result; }
     });
   });
-});
+}
 
 /* ── 計時 ───────────────────────────────────────────── */
 el('btnTimer').onclick = function () {
@@ -604,6 +651,14 @@ function paintWatch(st) {
       var tail = !res ? '' :
         res === 'draw' ? '　<b>平手</b>' :
         ((res === 'a') === mineIsA ? '　<b>你贏了</b>' : '　你輸了');
+      /* BO 制要看得到目前幾比幾 —— 選手最想知道的就是「還差幾局」 */
+      var mbo = mine.bo || 1;
+      if (mbo > 1) {
+        var mg = E.tallyGames(E.gamesOf(mine));
+        tail += '　<span class="sc">' + (mineIsA ? mg.a + '-' + mg.b : mg.b + '-' + mg.a) +
+                (mg.draw ? '（平 ' + mg.draw + '）' : '') +
+                '　BO' + mbo + '　先贏 ' + E.winsNeeded(mbo) + ' 局</span>';
+      }
       el('wtOpp').innerHTML = '對手　<b>' + esc(nameOf(st, oppId)) + '</b>' + tail;
     }
 
@@ -631,10 +686,11 @@ function paintWatch(st) {
     var bye = (m.b === null || m.b === undefined);
     var ca = m.result === 'a' ? ' win' : (m.result === 'b' ? ' lose' : '');
     var cb = m.result === 'b' ? ' win' : (m.result === 'a' ? ' lose' : '');
+    var mg = E.tallyGames(E.gamesOf(m));
+    var sc = (m.bo || 1) > 1 ? '<span class="x sc">' + mg.a + '-' + mg.b + '</span>' : '<span class="x">VS</span>';
     return '<div class="wr' + (isMine ? ' mine' : '') + '">' +
       '<span class="t">' + esc(m.table) + '</span>' + who(m.a, ca) +
-      (bye ? '<span class="s">輪空</span>'
-           : '<span class="x">VS</span>' + who(m.b, cb)) +
+      (bye ? '<span class="s">輪空</span>' : sc + who(m.b, cb)) +
       '</div>';
   }).join('') : '<div class="hint">還沒排對戰。</div>';
 
@@ -949,20 +1005,39 @@ function paintMatches(st) {
   el('matchList').innerHTML = ms.map(function (m) {
     var live = st.config.liveTable && m.table === st.config.liveTable;
     var mine = net.role === 'watch' && meId && (m.a === meId || m.b === meId);
+    var bo = m.bo || 1;
+    var g = E.tallyGames(E.gamesOf(m));
     var h = '<div class="mt' + (m.result ? ' done' : '') + (live ? ' islive' : '') +
-            (mine ? ' mine' : '') + '">' +
+            (mine ? ' mine' : '') + (bo > 1 ? ' bo' : '') + '">' +
             '<div class="tb">' + esc(m.table) + '</div>';
-    h += side(st, m, 'a', rm);
+    h += side(st, m, 'a', rm, bo, g);
     if (m.b === null || m.b === undefined) {
       h += '<div class="sd bye">輪空 · 視同勝</div>';
     } else {
       h += '<div class="dw' + (m.result === 'draw' ? ' on' : '') + '" data-t="' +
-           esc(m.table) + '" data-r="draw">平手</div>' + side(st, m, 'b', rm);
+           esc(m.table) + '" data-r="draw">平手' +
+           (g.draw ? '<b class="gn">×' + g.draw + '</b>' : '') + '</div>' +
+           side(st, m, 'b', rm, bo, g);
+      /* 退一局只在真的有東西可以退的時候出現 —— 空著的按鈕只會讓人以為壞了。
+         一勝制不需要它：再點同一邊就是取消。 */
+      if (bo > 1 && (g.a + g.b + g.draw) > 0) {
+        h += '<button class="undo" data-t="' + esc(m.table) + '" title="退掉最後一局">⌫<i>退一局</i></button>';
+      }
     }
     return h + '</div>';
   }).join('');
 }
-function side(st, m, which, rm) {
+
+/* 小局進度用點點表示，點滿就是拿下這一場。畫「要贏幾局」個點，
+   而不是「總共打幾局」—— 現場關心的是還差幾局，不是還剩幾局。 */
+function pipsOf(bo, won) {
+  if (bo <= 1) return '';
+  var need = E.winsNeeded(bo), s = '';
+  for (var i = 0; i < need; i++) s += '<i' + (i < won ? ' class="on"' : '') + '></i>';
+  return '<span class="pips">' + s + '</span>';
+}
+
+function side(st, m, which, rm, bo, g) {
   var id = which === 'a' ? m.a : m.b;
   var cls = 'sd';
   if (m.result === which) cls += ' win';
@@ -970,6 +1045,7 @@ function side(st, m, which, rm) {
   var r = rm && rm[id];
   return '<div class="' + cls + '" data-t="' + esc(m.table) + '" data-r="' + which + '">' +
          '<i>' + numOf(st, id) + '</i><span class="who">' + esc(nameOf(st, id)) + '</span>' +
+         pipsOf(bo || 1, which === 'a' ? g.a : g.b) +
          (r ? '<span class="rec num">' + r.rec + '</span>' : '') + '</div>';
 }
 
@@ -1079,9 +1155,16 @@ function pvLine(st, m, which, f, rank) {
   } else if (m.result && m.result !== 'draw' && m.result !== 'bye') {
     cls += ' lose';
   }
+  /* BO 制的投影用數字而不是點點 —— 場地最後一排看不清楚兩個點的差別 */
+  var bo = m.bo || 1, gm = '';
+  if (bo > 1) {
+    var g = E.tallyGames(E.gamesOf(m));
+    gm = '<b class="gm" style="font-size:' + (f * .72) + 'vw">' +
+         (which === 'a' ? g.a : g.b) + '</b>';
+  }
   return '<div class="' + cls + '" style="font-size:' + f + 'vw">' +
          '<i style="font-size:' + (f * .74) + 'vw">' + numOf(st, id) + '</i>' +
-         '<span class="nm2">' + esc(nameOf(st, id)) + '</span>' + tag +
+         '<span class="nm2">' + esc(nameOf(st, id)) + '</span>' + gm + tag +
          '<span class="rec" style="font-size:' + (f * .6) + 'vw">' + (rank[id] || '') + '</span></div>';
 }
 
@@ -1168,7 +1251,10 @@ addEventListener('hashchange', function () {
   if (location.hash === '#present') return;
   routeHash();
 });
-['fFormat', 'fNaming'].forEach(function (id) { el(id).onchange = syncFormatFields; });
+/* fCut 也要進來 —— 有沒有淘汰賽決定「淘汰賽幾勝制」該不該出現 */
+['fFormat', 'fNaming', 'fCut', 'fBo', 'fBoKO'].forEach(function (id) {
+  el(id).onchange = syncFormatFields;
+});
 ['fTables', 'fCustom'].forEach(function (id) { el(id).oninput = function () { updateTableHint(); }; });
 
 addEventListener('resize', function () { render(store.get()); });

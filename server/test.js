@@ -182,6 +182,57 @@ function sampleState() {
       console.log('  兩臺同時回報不同桌，兩筆都留住 ✓');
     }
 
+    head('【9】BO 制：副控送整場的小局，伺服器只收不算');
+    {
+      const st = sampleState();
+      st.matches = [{ round: 1, table: '1', a: 'p1', b: 'p2', bo: 3, games: [], result: null }];
+      const room = await post('/api/rooms', { state: st });
+      const c = room.body.code;
+
+      const one = await post('/api/rooms/' + c + '/action',
+        { op: 'match', round: 1, table: '1', games: ['a'], result: null });
+      ok(one.status === 200, '第一局應該收得下');
+      ok(one.body.state.matches[0].result === null, '一比零還沒分勝負');
+
+      const two = await post('/api/rooms/' + c + '/action',
+        { op: 'match', round: 1, table: '1', games: ['a', 'b', 'a'], result: 'a' });
+      ok(two.status === 200, '整場結果應該收得下');
+      const m = two.body.state.matches[0];
+      ok(m.result === 'a', 'result 應該是 a，得到 ' + m.result);
+      ok(m.games.join(',') === 'a,b,a', 'games 沒有完整留住：' + JSON.stringify(m.games));
+
+      const back = await post('/api/rooms/' + c + '/action',
+        { op: 'match', round: 1, table: '1', games: ['a', 'b'], result: null });
+      ok(back.body.state.matches[0].result === null, '退一局之後應該回到未定');
+      console.log('  BO3 一局一局送、退一局，伺服器都照收 ✓');
+    }
+
+    head('【10】壞掉的小局值要被擋下來');
+    {
+      const st = sampleState();
+      st.matches = [
+        { round: 1, table: '1', a: 'p1', b: 'p2', bo: 3, games: [], result: null },
+        { round: 1, table: '9', a: 'p3', b: null, bo: 1, games: [], result: 'bye' }
+      ];
+      const room = await post('/api/rooms', { state: st });
+      const c = room.body.code;
+      const bad = (body) => post('/api/rooms/' + c + '/action',
+        Object.assign({ op: 'match', round: 1, table: '1' }, body));
+
+      ok((await bad({ games: 'aaa', result: 'a' })).status === 409, 'games 不是陣列應該被擋');
+      ok((await bad({ games: ['a', 'x'], result: 'a' })).status === 409, '看不懂的小局值應該被擋');
+      ok((await bad({ games: ['a'], result: 'win' })).status === 409, '看不懂的 result 應該被擋');
+      ok((await bad({ games: new Array(20).fill('a'), result: 'a' })).status === 409,
+         '小局數量沒有上限');
+      const bye = await post('/api/rooms/' + c + '/action',
+        { op: 'match', round: 1, table: '9', games: ['a'], result: 'a' });
+      ok(bye.status === 409, '輪空的桌次不該收得下小局');
+
+      const fin = await api('/api/rooms/' + c);
+      ok(fin.body.state.matches[0].result === null, '被擋下來的請求不該改到狀態');
+      console.log('  格式不對一律 409，狀態不受影響 ✓');
+    }
+
   } finally {
     srv.kill();
   }

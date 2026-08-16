@@ -219,7 +219,26 @@ function create(opts) {
     });
   }
 
-  /* 加入者回報勝負 */
+  /* 加入者回報一整場的小局。BO 的規則只有 engine.js 一份，
+     副控在自己那邊算完再送過來，伺服器只驗格式、不重算。 */
+  function sendMatch(round, table, games, result) {
+    if (!conn || conn.role === 'watch') return Promise.resolve(null);
+    return api('/api/rooms/' + conn.code + '/action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'match', round: round, table: table,
+                             games: games, result: result })
+    }).then(function (j) {
+      online = true;
+      if (j.rev > lastRev) { lastRev = j.rev; on.state(j.state, conn.role); }
+      status('');
+      return j;
+    }).catch(function (e) {
+      online = false; status('送不出去：' + e.message, true);
+      throw e;
+    });
+  }
+
+  /* 加入者回報勝負（一勝制的老路，留著讓舊分頁還能用） */
   function sendResult(round, table, value) {
     if (!conn || conn.role === 'watch') return Promise.resolve(null);
     return api('/api/rooms/' + conn.code + '/action', {
@@ -262,7 +281,7 @@ function create(opts) {
     get server() { return base; },
     setServer: function (u) { base = String(u || '').replace(/\/+$/, ''); },
     host: host, join: join, leave: leave, resume: resume,
-    pushState: pushState, sendResult: sendResult, refresh: pullOnce
+    pushState: pushState, sendResult: sendResult, sendMatch: sendMatch, refresh: pullOnce
   };
 }
 

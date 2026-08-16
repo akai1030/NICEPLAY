@@ -175,6 +175,64 @@ const ROUND1 = [
       console.log('  單次推送　' + state.matches.length + ' 桌 ✓');
       n2.leave();
     }
+
+    head('【4】BO3：副控一局一局回報，主控要即時看到');
+    {
+      const E = require('../src/engine.js');
+      const hostState = makeState();
+      global.sessionStorage.removeItem('niceplay.net.v1');
+      global.localStorage.removeItem('niceplay.host.v1');
+
+      const host = Net.create({
+        server: BASE,
+        onState: remote => replaceInto(hostState, remote),
+        onStatus: () => {}
+      });
+      hostState.players = PLAYERS.slice();
+      hostState.matches = [
+        { round: 1, table: '1', a: 'p1', b: 'p2', bo: 3, games: [], result: null },
+        { round: 1, table: '2', a: 'p3', b: 'p4', bo: 3, games: [], result: null }
+      ];
+      await host.host(hostState);
+
+      /* 副控是另一支手機 —— 換一份分頁身分再連進同一個房間 */
+      global.sessionStorage.removeItem('niceplay.net.v1');
+      global.localStorage.removeItem('niceplay.host.v1');
+      const guestState = makeState();
+      const guest = Net.create({
+        server: BASE, isolate: true,
+        onState: remote => replaceInto(guestState, remote),
+        onStatus: () => {}
+      });
+      await guest.join(host.code);
+      ok(guest.role === 'guest', '應該是副控，得到 ' + guest.role);
+
+      /* 副控照 engine 的規則一局一局按下去 */
+      for (const v of ['a', 'b', 'a']) {
+        const m = guestState.matches.filter(x => x.table === '1')[0];
+        const next = E.playGame(m, v);
+        await guest.sendMatch(1, '1', next.games, next.result);
+      }
+      await sleep(700);
+
+      const hm = hostState.matches.filter(x => x.table === '1')[0];
+      ok(hm.result === 'a', '主控看到的勝負不對：' + hm.result);
+      ok((hm.games || []).join(',') === 'a,b,a',
+         '主控看到的小局不對：' + JSON.stringify(hm.games));
+      const other = hostState.matches.filter(x => x.table === '2')[0];
+      ok(other.result === null, '別桌不該被動到');
+      console.log('  副控按 a·b·a → 主控即時看到 2-1，a 勝 ✓');
+
+      /* 選手（觀眾碼）連寫都寫不進去 —— 這是伺服器擋的，不是把按鈕藏起來 */
+      const r = await fetch(BASE + '/api/rooms/' + host.viewCode + '/action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'match', round: 1, table: '2', games: ['a', 'a'], result: 'a' })
+      });
+      ok(r.status === 403, '選手查詢碼送小局應該回 403，得到 ' + r.status);
+      console.log('  選手拿查詢碼直接打 API 回報小局 → 403 ✓');
+
+      guest.leave(); host.leave();
+    }
   } catch (e) {
     fails++;
     console.log('\n  ✗ 測試自己爆了：' + (e && e.stack || e));

@@ -164,19 +164,48 @@ function publish(code, payload) {
    只支援「回報勝負」這一種 —— 那是非主控裝置唯一會做的事。
    其餘（配對、下一輪、改設定）一律由主控端送整份狀態。
    這樣伺服器就不需要懂賽制，賽制永遠只有一份實作。      */
-function applyResult(state, action) {
-  const round = action.round;
-  const table = String(action.table);
-  const value = action.value;                    /* 'a' | 'b' | 'draw' | null */
-  if (!Array.isArray(state.matches)) return false;
-  let hit = false;
+function findMatch(state, round, table) {
+  if (!Array.isArray(state.matches)) return null;
+  const t = String(table);
   for (const m of state.matches) {
-    if (String(m.round) !== String(round) || String(m.table) !== table) continue;
-    m.result = (m.result === value) ? null : value;
-    hit = true;
-    break;
+    if (String(m.round) === String(round) && String(m.table) === t) return m;
   }
-  return hit;
+  return null;
+}
+
+/* 一勝制的老路：點同一邊＝取消，點另一邊＝改判 */
+function applyResult(state, action) {
+  const m = findMatch(state, action.round, action.table);
+  if (!m) return false;
+  const value = action.value;                    /* 'a' | 'b' | 'draw' | null */
+  m.result = (m.result === value) ? null : value;
+  m.games = (m.result && m.result !== 'bye') ? [m.result] : [];
+  return true;
+}
+
+/* BO 制：小局怎麼推出整場勝負，規則只有 src/engine.js 一份。
+   這裡不重算，只收下副控算好的結果 ——
+   server/ 是獨立部署的 Root Directory，require('../src/engine.js') 會找不到檔案，
+   照抄一份到這裡就等於同一條規則有兩個實作，遲早會分岔。
+
+   把關的是「格式」而不是「賽制」：小局只能是那三個值、長度有上限、
+   結果只能是那四種。權限本來就是「碼即權限」，這裡不多做假設。 */
+const GAME_VALUES = ['a', 'b', 'draw'];
+const RESULT_VALUES = [null, 'a', 'b', 'draw'];
+const MAX_GAMES = 9;
+
+function applyMatch(state, action) {
+  const m = findMatch(state, action.round, action.table);
+  if (!m) return false;
+  if (m.b === null || m.b === undefined) return false;   /* 輪空沒有小局 */
+  const games = action.games;
+  if (!Array.isArray(games) || games.length > MAX_GAMES) return false;
+  if (!games.every(g => GAME_VALUES.indexOf(g) >= 0)) return false;
+  const result = (action.result === undefined) ? null : action.result;
+  if (RESULT_VALUES.indexOf(result) < 0) return false;
+  m.games = games.slice();
+  m.result = result;
+  return true;
 }
 
 /* ── HTTP ──────────────────────────────────────────── */
@@ -297,10 +326,13 @@ const server = http.createServer(async (req, res) => {
       if (sub === 'action' && req.method === 'POST') {
         if (room.readOnly) return json(res, 403, { error: '這是選手查詢碼，只能看不能改' });
         const body = await readBody(req, 64 * 1024);
-        if (body.op !== 'result') return json(res, 400, { error: '不支援的操作' });
         const state = room.state;
-        if (!applyResult(state, body)) {
-          return json(res, 409, { error: '找不到那一桌', rev: room.rev, state });
+        let done;
+        if (body.op === 'match') done = applyMatch(state, body);
+        else if (body.op === 'result') done = applyResult(state, body);
+        else return json(res, 400, { error: '不支援的操作' });
+        if (!done) {
+          return json(res, 409, { error: '找不到那一桌，或小局格式不對', rev: room.rev, state });
         }
         const rev = room.rev + 1;
         await store.put(room.code, state, rev);

@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608161611">
+<link rel="stylesheet" href="src/style.css?v=202608161630">
 </head>
 <body>
 
@@ -43,7 +43,10 @@
 </nav>
 
 <!-- ── 設定 ─────────────────────────────────────────── -->
-<div class="pane on" id="tSetup"><div class="wrap">
+<!-- 寬螢幕分兩欄：左邊是「這場比賽怎麼跑」，右邊是「跟人有關的事」。
+     窄螢幕時 .cols 不生效，就還原成原本由上到下的一欄。 -->
+<div class="pane on" id="tSetup"><div class="wrap cols">
+ <section class="col">
 
   <h2 class="sec">Event<em>賽事資訊</em></h2>
   <div class="row">
@@ -84,6 +87,22 @@
         <option value="16">前 16 名</option>
       </select></label>
   </div>
+  <div class="row">
+    <label class="fld" id="wrapBo"><span>常規賽每場幾勝制</span>
+      <select id="fBo">
+        <option value="1">BO1　一局定勝負</option>
+        <option value="2">BO2　打兩局，1-1 算平手</option>
+        <option value="3">BO3　先贏兩局</option>
+        <option value="5">BO5　先贏三局</option>
+      </select></label>
+    <label class="fld" id="wrapBoKO"><span>淘汰賽每場幾勝制</span>
+      <select id="fBoKO">
+        <option value="1">BO1　一局定勝負</option>
+        <option value="3">BO3　先贏兩局</option>
+        <option value="5">BO5　先贏三局</option>
+      </select></label>
+  </div>
+  <div class="hint" id="boHint"></div>
 
   <h2 class="sec sec-gap">Tables<em>桌次</em></h2>
   <div class="row">
@@ -117,7 +136,10 @@
     填 0 就完全不計時。時間到不會自動換輪 —— 換輪永遠是你按「下一輪」。
   </div>
 
-  <h2 class="sec sec-gap">Devices<em>多裝置 · 手機遙控</em></h2>
+ </section>
+ <section class="col">
+
+  <h2 class="sec">Devices<em>多裝置 · 手機遙控</em></h2>
   <div class="hint" style="margin-top:0">
     不開房也能辦完整場比賽 —— 這一區只在你要<b>讓副控用手機幫忙回報</b>、
     或<b>讓選手自己查桌號</b>時才需要。按下去會產生兩條連結，貼到群組就好，
@@ -198,6 +220,7 @@
     <button class="danger" id="btnReset" style="width:100%">全部清除重來</button>
   </div>
 
+ </section>
 </div></div>
 
 <!-- ── 對戰 ─────────────────────────────────────────── -->
@@ -421,6 +444,12 @@
        <b>桌號</b>可以是數字、字母，或自己打（例如 Q1, Q2）。
        <b>主桌／直播桌</b>填了之後，那一桌在投影畫面會被框起來。</p>
     <p><b>每輪分鐘</b>填 0 就不計時。實體卡牌賽常見是 25 分鐘。</p>
+    <p><b>幾勝制</b>分成兩格，因為現場最常見的辦法就是兩段不一樣：
+       常規賽跑 <span class="key">BO1</span> 控時間，切進淘汰賽才改 <span class="key">BO3</span>。
+       BO3 是先贏兩局、BO5 是先贏三局；打滿還沒有人過半就算平手
+       （BO2 的 1-1、BO3 的 1-1-1）。</p>
+    <div class="bk-note"><b>每一場的幾勝制在排出來的當下就定了。</b>
+      比賽跑到一半改設定，只會影響之後排的輪次，已經打完的不會被改寫。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">4</div><div>
@@ -446,8 +475,15 @@
       <li>打完一桌就<b>點贏的那一邊</b>（點錯再點一次就取消）；平手點中間那個格。</li>
       <li>全部回報完了，按 <span class="key">下一輪</span>。</li>
     </ul>
+    <p><b>BO3 / BO5 的時候</b>，一樣是點贏的那一邊，但那算<b>一局</b>；
+       名字旁邊的點點就是這一場的進度，點滿就拿下。點錯按卡片右邊的
+       <span class="key">⌫ 退一局</span> 往回退 —— 勝負一旦定了會鎖住，
+       要改就先退一局。</p>
     <div class="bk-note"><b>建議的現場節奏：</b>時間到 → 給大家幾分鐘確認戰績 → 確認完才按「下一輪」。
       按下去才會重新排位子，不會提前跑掉。</div>
+    <div class="bk-note"><b>兩顆按鈕長得不一樣是故意的。</b>
+      「開始計時」是金色，按錯再按一次就回來；「下一輪」是藍色，而且整輪都回報完
+      才會亮成漸層 —— 那時候才是真的該按它。</div>
   </div></div>
 
   <div class="bk-step"><div class="no">7</div><div>
@@ -483,7 +519,11 @@
     <ul>
       <li><b>排錯了、有人臨時跑掉</b> → 對戰頁按「重排這一輪」。</li>
       <li><b>有人退賽</b> → 排名頁點他旁邊的「退賽」。他打過的場次還算數，之後不再被排對。</li>
-      <li><b>電腦快沒電、想換一臺</b> → 按「匯出存檔」存一個檔，新電腦按「匯入存檔」。</li>
+      <li><b>電腦快沒電、想換一臺</b> → 按「匯出存檔」存一個檔，新電腦按「匯入存檔」。
+        賽況（名單、賽制、所有勝負、計時）會完整照搬過去。
+        <b>但主控權限不在存檔裡</b> —— 那把鑰匙只存在原本那臺的瀏覽器。
+        所以新電腦匯入之後要<b>重新開房</b>，把新的副控密碼與選手 QR 再發一次；
+        舊房間會在 36 小時後自己消失。</li>
       <li><b>不小心重整、瀏覽器關掉</b> → 直接重新打開網址，資料還在。</li>
       <li><b>對戰／排名分頁是空的</b> → 點進去它會告訴你差什麼、按哪裡補。</li>
       <li><b>副控說連不上</b> → 請他確認網址跟你複製的那條一樣，密碼是六碼。</li>
@@ -532,11 +572,11 @@
 
 <div id="toast"></div>
 
-<script src="src/qr.js?v=202608161611"></script>
-<script src="src/engine.js?v=202608161611"></script>
-<script src="src/store.js?v=202608161611"></script>
-<script src="src/net.js?v=202608161611"></script>
-<script src="src/ui.js?v=202608161611"></script>
+<script src="src/qr.js?v=202608161630"></script>
+<script src="src/engine.js?v=202608161630"></script>
+<script src="src/store.js?v=202608161630"></script>
+<script src="src/net.js?v=202608161630"></script>
+<script src="src/ui.js?v=202608161630"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -544,7 +584,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608161611').catch(function () {});
+    navigator.serviceWorker.register('sw.js?v=202608161630').catch(function () {});
   });
 }
 </script>

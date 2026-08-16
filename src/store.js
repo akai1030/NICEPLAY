@@ -35,6 +35,10 @@ function blank() {
       format: 'swiss',          /* swiss | single | roundrobin */
       rounds: 4,
       cut: 0,                   /* 瑞士制跑完取前 N 名打淘汰賽，0 = 不打 */
+      /* 幾勝制。常規賽與淘汰賽分開設 —— 現場最常見的辦法就是
+         瑞士制跑 BO1 控時間，切進淘汰賽才改 BO3。 */
+      bo: 1,                    /* 常規賽（瑞士／循環）每場幾勝制 */
+      boKO: 3,                  /* 淘汰賽每場幾勝制 */
       minutes: 30,              /* 每輪時間，0 = 不計時 */
       tableNaming: 'number',    /* number | letter | custom */
       tableCount: 0,            /* 0 = 依人數自動 */

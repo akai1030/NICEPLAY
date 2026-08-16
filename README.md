@@ -19,6 +19,13 @@
 | 循環賽 | 每人與其他所有人各打一場 |
 | 瑞士制 + 淘汰 | 瑞士制跑完取前 N 名接單敗淘汰 |
 
+**幾勝制**
+
+- 常規賽與淘汰賽分開設 —— 現場最常見的是瑞士制 BO1 控時間，切進淘汰賽改 BO3
+- BO1 / BO2 / BO3 / BO5；先過半就拿下，打滿沒過半算平手（BO2 的 1-1、BO3 的 1-1-1）
+- 幾勝制在場次排出來的當下就蓋上去，中途改設定不會追溯改寫已打完的輪次
+- 小局只是紀錄。整場的勝負仍然只寫在 `m.result`，積分／OMW／配對／晉級全部只讀它
+
 **計分**
 
 - 勝／平／敗分數可調，預設 3 / 1 / 0，輪空視同勝
@@ -56,6 +63,8 @@
 
 - localStorage 本機儲存，匯出／匯入 JSON
 - 同機多視窗經 BroadcastChannel 同步
+- 存檔帶的是賽況，不含主控權限（`hostToken` 只在原本那臺的 sessionStorage）——
+  換電腦匯入之後要重新開房，副控密碼與選手 QR 一併重發
 
 ---
 
@@ -88,7 +97,7 @@ python3 -m http.server 8123
 
 **前端**　靜態站，指向根目錄。Zeabur 已附 `zbpack.json`，Add Service → Git 選本 repo 即可。Cloudflare Pages / Netlify / GitHub Pages / Vercel 同理。
 
-改完前端、推上去之前先跑 `tools/stamp.sh`。CDN 會把 `.css` / `.js` 快取數小時而 `index.html` 每次回源，不蓋版本章的話使用者會拿到新 HTML 配舊 CSS。Service Worker 的註冊網址也一併蓋 —— 那支檔案只認註冊時的網址，沒帶版本就得等快取自己過期。
+改完前端、推上去之前先跑 `sh tools/test.sh` 再跑 `tools/stamp.sh`。CDN 會把 `.css` / `.js` 快取數小時而 `index.html` 每次回源，不蓋版本章的話使用者會拿到新 HTML 配舊 CSS。Service Worker 的註冊網址也一併蓋 —— 那支檔案只認註冊時的網址，沒帶版本就得等快取自己過期。
 
 **房間伺服器**（選配）　Add Service → Git → Root Directory 設為 `server`。
 
@@ -130,6 +139,11 @@ E.suggestRounds(32);                    // 5
 E.makeTables(4, 'letter');              // ['A','B','C','D']
 E.standings(players, matches, rules);   // 含 OMW / OOMW 的完整名次
 E.nextRound(state);                     // { matches } | { done } | { error }
+
+E.winsNeeded(3);                        // 2
+E.matchResult(['a','b','a'], 3);        // 'a'
+E.matchResult(['a','b'], 2);            // 'draw'
+E.playGame(match, 'a');                 // { games, result } | null（這一下沒有作用）
 ```
 
 512 人九輪，單輪配對 3.2 ms，零重複對手。
@@ -139,9 +153,13 @@ E.nextRound(state);                     // { matches } | { done } | { error }
 ## 測試
 
 ```bash
-node test/engine.test.js    # 引擎 11 組
-node server/test.js         # 伺服器 8 組
-node test/net.test.js       # 連線層 3 組（會自己起伺服器）
+sh tools/test.sh            # 一次跑完下面五組
+
+node test/engine.test.js    # 引擎 11 組　　賽制算得對不對
+node test/bo.test.js        # 幾勝制 12 組　含「小局不影響名次」那條界線
+node server/test.js         # 伺服器 10 組　HTTP 行為與權限
+node test/net.test.js       # 連線層 4 組　　拿真的 net.js 對真的伺服器跑
+node test/check.js          # 靜態 10 組　　標籤閉合、id、版本章、字級規範
 
 python3 -m http.server 8123
 #  /test/e2e.html                                單機端對端

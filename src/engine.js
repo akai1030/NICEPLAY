@@ -37,6 +37,61 @@ function rulesOf(r) {
 }
 function num(v, d) { return (typeof v === 'number' && isFinite(v)) ? v : d; }
 
+/* ── 幾勝制（BO）───────────────────────────────────────
+   一「場」由若干「局」組成。BO3 就是先贏兩局的人拿下這一場。
+
+   小局只是紀錄。整場的勝負仍然只寫在 m.result —— 積分、OMW、配對、
+   淘汰賽晉級全部只讀 m.result，所以那一整套完全不因為 BO 而改動。
+
+   m.bo 蓋在場次上，而不是每次回頭讀設定：中途把 BO1 改成 BO3，
+   已經打完的場次不會被追溯改寫。
+
+   打滿還沒有人過半就是平手 —— BO2 的 1-1、BO3 的 1-1-1 都算平手，
+   剛好接上原本就有的平手計分，不必另外發明規則。 */
+function winsNeeded(bo) { return Math.floor(Math.max(1, num(bo, 1)) / 2) + 1; }
+
+function tallyGames(games) {
+  var t = { a: 0, b: 0, draw: 0 };
+  (games || []).forEach(function (g) {
+    if (g === 'a') t.a++; else if (g === 'b') t.b++; else if (g === 'draw') t.draw++;
+  });
+  return t;
+}
+
+function matchResult(games, bo) {
+  bo = Math.max(1, num(bo, 1));
+  var need = winsNeeded(bo), t = tallyGames(games);
+  if (t.a >= need) return 'a';
+  if (t.b >= need) return 'b';
+  if (t.a + t.b + t.draw >= bo) return t.a > t.b ? 'a' : (t.b > t.a ? 'b' : 'draw');
+  return null;
+}
+
+/* 舊存檔只有 result、沒有 games —— 補一局出來，後面就能一視同仁 */
+function gamesOf(m) {
+  if (m && Array.isArray(m.games)) return m.games.slice();
+  return (m && m.result && m.result !== 'bye') ? [m.result] : [];
+}
+
+/* 點一下之後這一場變成什麼樣。want 傳 null 代表「退一局」。
+   回 null 表示這一下不該有作用（例如勝負已定又想再加一局）。
+   主控與副控都走這一條，所以兩邊的行為一定一致。 */
+function playGame(m, want) {
+  var bo = Math.max(1, num(m && m.bo, 1));
+  var games = gamesOf(m);
+  if (want === null || want === undefined) {
+    if (!games.length) return null;
+    games.pop();
+  } else if (bo === 1) {
+    /* 一勝制維持原本的點法：點同一邊＝取消，點另一邊＝直接改判 */
+    games = (games[0] === want) ? [] : [want];
+  } else {
+    if (matchResult(games, bo)) return null;   /* 已經分出勝負，要先退一局 */
+    games.push(want);
+  }
+  return { games: games, result: matchResult(games, bo) };
+}
+
 /* ── 桌號 ────────────────────────────────────────────────
    三種命名方式。字母超過 26 桌會接續 AA、AB…，
    數字則直接 1…N。自訂就照給的清單，不夠時補號碼。 */
@@ -322,12 +377,15 @@ function nextBracketRound(prevMatches, players) {
 
 /* ── 發桌位 ─────────────────────────────────────────────
    名次最高的一組坐第一張桌。輪空不佔桌。 */
-function assignTables(pairs, tableNames) {
+function assignTables(pairs, tableNames, bo) {
+  bo = Math.max(1, num(bo, 1));
   return pairs.map(function (p, i) {
     return {
       table: tableNames[i] !== undefined ? tableNames[i] : String(i + 1),
       a: p[0] ? p[0].id : null,
       b: p[1] ? p[1].id : null,
+      bo: p[1] ? bo : 1,               /* 輪空沒有小局可打 */
+      games: [],
       result: p[1] ? null : 'bye'
     };
   });
@@ -360,9 +418,10 @@ function nextRound(state) {
 
   function finish(res) {
     var names = tableNamesFor(cfg, res.pairs.length);
-    var list = assignTables(res.pairs, names);
+    /* 常規賽（瑞士／循環）用 cfg.bo，淘汰賽走 bracketNext 用 cfg.boKO */
+    var list = assignTables(res.pairs, names, cfg.bo);
     if (res.bye !== null && res.bye !== undefined) {
-      list.push({ table: '輪空', a: res.bye, b: null, result: 'bye' });
+      list.push({ table: '輪空', a: res.bye, b: null, bo: 1, games: [], result: 'bye' });
     }
     return { matches: list, notes: res.notes || [] };
   }
@@ -383,7 +442,7 @@ function bracketNext(state, matches, prefix) {
     var n = cfg.format === 'single' ? base.length : Math.min(cfg.cut, base.length);
     var pairs = bracketFrom(base, n);
     if (!pairs.length) return { error: '人數不足，排不出淘汰賽' };
-    return { matches: tagRound(assignTables(pairs, names), koLabel(pairs.length)), notes: [] };
+    return { matches: tagRound(assignTables(pairs, names, cfg.boKO), koLabel(pairs.length)), notes: [] };
   }
 
   /* 找最後一輪淘汰賽 */
@@ -392,7 +451,7 @@ function bracketNext(state, matches, prefix) {
   var nx = nextBracketRound(lastMs, players);
   if (nx === null) return { error: '上一輪還沒全部回報勝負' };
   if (!nx.length || (nx.length === 1 && nx[0][1] === null)) return { done: true, notes: ['已經打到冠軍'] };
-  return { matches: tagRound(assignTables(nx, names), koLabel(nx.length)), notes: [] };
+  return { matches: tagRound(assignTables(nx, names, cfg.boKO), koLabel(nx.length)), notes: [] };
 }
 
 /* 淘汰賽輪次的名字用「還剩幾強」表示，跟現場講法一致 */
@@ -437,6 +496,8 @@ function check(list) {
 
 return {
   DEFAULT_RULES: DEFAULT_RULES,
+  winsNeeded: winsNeeded, tallyGames: tallyGames,
+  matchResult: matchResult, gamesOf: gamesOf, playGame: playGame,
   letterName: letterName, makeTables: makeTables,
   suggestTables: suggestTables, suggestRounds: suggestRounds,
   tally: tally, winPct: winPct, standings: standings,
