@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202608162337">
+<link rel="stylesheet" href="src/style.css?v=202608162346">
 </head>
 <body>
 
@@ -210,6 +210,20 @@
           <input type="text" id="roomCode" readonly></label>
         <label class="fld"><span>選手查詢碼</span>
           <input type="text" id="viewCode" readonly></label>
+      </div>
+      <!-- 主控權限的備援。存檔不帶鑰匙，這裡才帶。 -->
+      <div class="lkrow" id="adoptOut" hidden>
+        <input type="text" id="takeKey" readonly>
+        <button class="sm main" data-copy="takeKey">複製接管碼</button>
+      </div>
+      <div class="hint" id="adoptOutHint" hidden>
+        <b>換電腦、或這臺掛掉時用的。</b>把這串抄到手機備忘錄，新電腦匯入存檔之後
+        貼進下面那格，就能接回同一個房間 —— 副控密碼與選手 QR 都不用重發。
+        <b>不要外流</b>：拿到它等於拿到主控權。
+      </div>
+      <div class="lkrow">
+        <input type="text" id="adoptKey" placeholder="貼上接管碼（NP1.…）">
+        <button class="sm" id="btnAdopt">接管房間</button>
       </div>
       <label class="fld"><span>房間伺服器位址</span>
         <input type="text" id="fServer" placeholder="https://你的房間伺服器"></label>
@@ -649,11 +663,11 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202608162337"></script>
-<script src="src/engine.js?v=202608162337"></script>
-<script src="src/store.js?v=202608162337"></script>
-<script src="src/net.js?v=202608162337"></script>
-<script src="src/ui.js?v=202608162337"></script>
+<script src="src/qr.js?v=202608162346"></script>
+<script src="src/engine.js?v=202608162346"></script>
+<script src="src/store.js?v=202608162346"></script>
+<script src="src/net.js?v=202608162346"></script>
+<script src="src/ui.js?v=202608162346"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -661,7 +675,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202608162337').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202608162346').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {

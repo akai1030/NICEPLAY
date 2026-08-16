@@ -63,10 +63,20 @@ head('【3】ui.js 取用的元素都真的在 index.html 裡');
   const missing = [...used].filter(i => !ids.has(i));
   ok(!missing.length, 'ui.js 會拿到 null：' + missing.join('、'));
 
+  /* 選擇器指到的 class 可以寫死在 HTML 裡，也可以是 ui.js 自己畫出來的
+     （對戰卡、名次列都是動態生成）—— 兩邊都找不到才算是打錯字。 */
   const sels = [...ui.matchAll(/querySelector(?:All)?\('([^']+)'\)/g)].map(m => m[1]);
   sels.forEach(sel => {
-    const cls = sel.match(/\.([\w-]+)/);
-    if (cls) ok(html.indexOf(cls[1]) >= 0, '選擇器 ' + sel + ' 在 HTML 裡找不到對應的 class');
+    /* 先把屬性選擇器整段拿掉，不然 script[src*="ui.js"] 裡的 .js
+       會被當成 class 名 */
+    const bare = sel.replace(/\[[^\]]*\]/g, '');
+    (bare.match(/\.([\w-]+)/g) || []).forEach(c => {
+      const cls = c.slice(1);
+      ok(html.indexOf('"' + cls) >= 0 || html.indexOf(cls + '"') >= 0 ||
+         html.indexOf(cls + ' ') >= 0 || ui.indexOf('"' + cls) >= 0 ||
+         ui.indexOf(cls + ' ') >= 0 || ui.indexOf("'" + cls) >= 0,
+         '選擇器 ' + sel + ' 用到的 class「' + cls + '」在 HTML 與 ui.js 裡都找不到');
+    });
   });
   console.log('  ' + used.size + ' 個 id、' + sels.length + ' 條選擇器都對得上 ✓');
 }

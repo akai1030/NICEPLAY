@@ -258,6 +258,9 @@ button.big { min-height: 60px; font-size: 18px; }
 }
 .mt.done .tb { border-color: var(--lime); color: var(--accent-fg); }
 .mt.islive .tb { box-shadow: 0 0 0 3px var(--glow); }
+/* .sd 與 .dw 現在是真的 <button>，所以要把 button 的預設拉回來：
+   文字靠左（button 預設置中）、字體繼承、圓角與內距照這裡的規格。 */
+.mt .sd, .mt .dw { font-family: inherit; text-align: left; letter-spacing: 0; }
 .mt .sd {
   flex: 1 1 0; min-width: 0; background: var(--surface);
   border: 2px solid var(--line-hard); border-radius: var(--r);
@@ -286,6 +289,7 @@ button.big { min-height: 60px; font-size: 18px; }
   flex: 0 0 54px; display: flex; align-items: center; justify-content: center;
   border: 2px dashed var(--line-hard); border-radius: var(--r);
   font-size: 13px; color: var(--dim); cursor: pointer; min-height: 56px;
+  background: transparent; padding: 0; text-align: center; flex-direction: column;
 }
 .mt .dw.on { background: var(--gold); border-style: solid; border-color: var(--gold);
              color: var(--black); font-weight: 900; }

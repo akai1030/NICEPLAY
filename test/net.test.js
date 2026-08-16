@@ -233,6 +233,133 @@ const ROUND1 = [
 
       guest.leave(); host.leave();
     }
+    head('【5】三方合併：只採用「我沒動過」的那些桌');
+    {
+      const E = require('../src/engine.js');
+      const mk = (t, res, games) => ({ round: 1, table: t, a: 'p1', b: 'p2', bo: 3,
+                                       games: games || [], result: res || null });
+      /* 基準：兩桌都還沒回報 */
+      const base = { matches: [mk('1'), mk('2')] };
+      /* 我這邊改了第 2 桌；對面（副控）回報了第 1 桌 */
+      const mine = { matches: [mk('1'), mk('2', 'a', ['a', 'a'])] };
+      const theirs = { matches: [mk('1', 'b', ['b', 'b']), mk('2')] };
+
+      const out = E.mergeResults(mine, theirs, base);
+      const m1 = out.state.matches.filter(m => m.table === '1')[0];
+      const m2 = out.state.matches.filter(m => m.table === '2')[0];
+      ok(m1.result === 'b', '對面回報的第 1 桌沒有被採用：' + m1.result);
+      ok(m2.result === 'a', '我改的第 2 桌被對面蓋掉了：' + m2.result);
+      ok(out.adopted.join(',') === '1', '採用清單不對：' + JSON.stringify(out.adopted));
+      console.log('  對面回報的採用、我改的保留、清單回報得出來 ✓');
+    }
+
+    head('【6】我動過的那一桌，不會被伺服器的舊值救回來');
+    {
+      const E = require('../src/engine.js');
+      const mk = (t, res, games) => ({ round: 1, table: t, a: 'p1', b: 'p2', bo: 1,
+                                       games: games || [], result: res || null });
+      /* 基準是「已經回報 a 勝」；我把它取消了，對面還停在 a 勝 */
+      const base = { matches: [mk('1', 'a', ['a'])] };
+      const mine = { matches: [mk('1')] };
+      const theirs = { matches: [mk('1', 'a', ['a'])] };
+      const out = E.mergeResults(mine, theirs, base);
+      ok(out.state.matches[0].result === null,
+         '主控的取消回報被舊值蓋回來了 —— 這樣就永遠取消不掉');
+
+      /* 我剛排出來的新輪次，base 裡還沒有 —— 不該去合併 */
+      const fresh = { matches: [{ round: 2, table: '1', a: 'p1', b: 'p2', bo: 1, games: [], result: null }] };
+      const stale = { matches: [{ round: 2, table: '1', a: 'p1', b: 'p2', bo: 1, games: ['a'], result: 'a' }] };
+      const out2 = E.mergeResults(fresh, stale, base);
+      ok(out2.state.matches[0].result === null, '剛排出來的輪次不該被合併');
+      console.log('  取消回報守得住，剛排的輪次不受影響 ✓');
+    }
+
+    head('【7】樂觀鎖：版本對不上就退回現況，不直接覆寫');
+    {
+      const st = makeState();
+      st.matches = [{ round: 1, table: '1', a: 'p1', b: 'p2', bo: 1, games: [], result: null }];
+      const room = await fetch(BASE + '/api/rooms', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: st })
+      }).then(r => r.json());
+
+      /* 副控回報一桌 → rev 變成 2 */
+      await fetch(BASE + '/api/rooms/' + room.code + '/action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'result', round: 1, table: '1', value: 'a' })
+      }).then(r => r.json());
+
+      /* 主控拿著 rev 1 的認知硬推 —— 應該被擋下來 */
+      const clash = await fetch(BASE + '/api/rooms/' + room.code + '/state', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostToken: room.hostToken, baseRev: 1, state: st })
+      });
+      const cj = await clash.json();
+      ok(clash.status === 409, '版本對不上應該回 409，得到 ' + clash.status);
+      ok(cj.stale === true, '應該標示 stale');
+      ok(cj.state.matches[0].result === 'a', '退回的現況要帶著副控那一筆');
+
+      /* 帶對版本就過 */
+      const okRes = await fetch(BASE + '/api/rooms/' + room.code + '/state', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostToken: room.hostToken, baseRev: cj.rev, state: st })
+      });
+      ok(okRes.status === 200, '版本正確卻被擋，得到 ' + okRes.status);
+
+      /* 沒帶 baseRev 的舊前端照舊放行，不要把人擋在門外 */
+      const legacy = await fetch(BASE + '/api/rooms/' + room.code + '/state', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostToken: room.hostToken, state: st })
+      });
+      ok(legacy.status === 200, '沒帶 baseRev 的舊前端應該照舊能推');
+      console.log('  對不上 409 帶現況 · 對得上放行 · 舊前端不受影響 ✓');
+    }
+
+    head('【8】接管碼：換一臺電腦接回同一個房間');
+    {
+      const state = makeState();
+      global.sessionStorage.removeItem('niceplay.net.v1');
+      global.localStorage.removeItem('niceplay.host.v1');
+      const first = Net.create({
+        server: BASE, onState: r => replaceInto(state, r), onStatus: () => {}
+      });
+      state.players = PLAYERS.slice();
+      state.matches = ROUND1.slice();
+      await first.host(state);
+      const key = first.takeoverKey;
+      ok(/^NP1\./.test(key), '接管碼格式不對：' + key);
+      const code = first.code;
+
+      /* 換一臺電腦：全新的分頁身分，什麼都沒有 */
+      global.sessionStorage.removeItem('niceplay.net.v1');
+      global.localStorage.removeItem('niceplay.host.v1');
+      const newPC = makeState();
+      const second = Net.create({
+        server: BASE, isolate: true,
+        onState: r => replaceInto(newPC, r), onStatus: () => {}
+      });
+      ok(second.role === 'off', '新電腦一開始應該是單機，得到 ' + second.role);
+
+      const got = await second.adopt(key);
+      ok(second.role === 'host', '接管之後應該是主控，得到 ' + second.role);
+      ok(second.code === code, '接到的房號不對：' + second.code);
+      ok(got.state.matches.length === 2, '接管時應該拿得到賽況');
+
+      /* 真正的考驗：新電腦推得動狀態嗎（推不動就等於沒接管） */
+      newPC.matches = ROUND1.slice();
+      newPC.matches[0].result = 'a';
+      await second.pushState(newPC);
+      await sleep(400);
+      const chk = await fetch(BASE + '/api/rooms/' + code).then(r => r.json());
+      ok(chk.state.matches[0].result === 'a', '接管之後推不動狀態，等於沒接管');
+
+      let bad = null;
+      await second.adopt('NP1.這不是合法的').catch(e => { bad = e; });
+      ok(bad !== null, '壞掉的接管碼應該要報錯');
+      console.log('  新電腦貼上接管碼 → 變主控 · 推得動狀態 · 壞碼會擋 ✓');
+      second.leave(); first.leave();
+    }
+
   } catch (e) {
     fails++;
     console.log('\n  ✗ 測試自己爆了：' + (e && e.stack || e));

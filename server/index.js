@@ -153,11 +153,30 @@ function subscribe(code, res) {
     if (!s.size) subs.delete(code);
   };
 }
+function clientCount(code) {
+  const s = subs.get(code);
+  return s ? s.size : 0;
+}
 function publish(code, payload) {
   const s = subs.get(code);
   if (!s) return;
-  const line = 'data: ' + JSON.stringify(payload) + '\n\n';
+  const line = 'data: ' + JSON.stringify(
+    Object.assign({ clients: s.size }, payload)) + '\n\n';
   for (const res of s) { try { res.write(line); } catch (e) {} }
+}
+/* 有人接上或斷線就通知同房的其他人 ——
+   主控在意的是「副控還在不在」，而那件事不會有狀態變動來帶出。
+
+   剛連上的那一臺不通知：它的初始封包裡已經有 clients 了，
+   再推一次只是多一則沒有內容的訊息。 */
+function publishPresence(code, except) {
+  const s = subs.get(code);
+  if (!s) return;
+  const line = 'data: ' + JSON.stringify({ presence: true, clients: s.size }) + '\n\n';
+  for (const res of s) {
+    if (res === except) continue;
+    try { res.write(line); } catch (e) {}
+  }
 }
 
 /* ── 把單一操作套進狀態 ────────────────────────────────
@@ -282,7 +301,8 @@ const server = http.createServer(async (req, res) => {
       /* 取狀態（輪詢用） */
       if (!sub && req.method === 'GET') {
         return json(res, 200, {
-          code: code, rev: room.rev, state: room.state, readOnly: !!room.readOnly
+          code: code, rev: room.rev, state: room.state, readOnly: !!room.readOnly,
+          clients: clientCount(room.code)
         });
       }
 
@@ -296,13 +316,18 @@ const server = http.createServer(async (req, res) => {
           'X-Accel-Buffering': 'no'
         });
         res.write('retry: 3000\n\n');
-        res.write('data: ' + JSON.stringify({
-          rev: room.rev, state: room.state, readOnly: !!room.readOnly
-        }) + '\n\n');
         const off = subscribe(room.code, res);
+        res.write('data: ' + JSON.stringify({
+          rev: room.rev, state: room.state, readOnly: !!room.readOnly,
+          clients: clientCount(room.code)
+        }) + '\n\n');
+        publishPresence(room.code, res);         /* 通知同房其他人：有人接上了 */
         /* 心跳：中間有代理時避免連線被當成閒置砍掉 */
         const beat = setInterval(() => { try { res.write(': ping\n\n'); } catch (e) {} }, 25000);
-        req.on('close', () => { clearInterval(beat); off(); });
+        req.on('close', () => {
+          clearInterval(beat); off();
+          publishPresence(room.code);            /* 通知同房：有人離開了 */
+        });
         return;
       }
 
@@ -315,6 +340,17 @@ const server = http.createServer(async (req, res) => {
         }
         if (!body.state || typeof body.state !== 'object') {
           return json(res, 400, { error: '缺少 state' });
+        }
+        /* 樂觀鎖。主控說「我是根據第 N 版改的」，而現在已經是第 N+1 版 ——
+           代表這中間有人回報了一桌，直接蓋下去那一筆就沒了。
+           退回現況讓主控合併再推一次；合併規則在 engine.js，這裡不碰。
+           沒帶 baseRev 的是舊版前端，照舊直接覆寫，不要把人擋在門外。 */
+        if (body.baseRev !== undefined && body.baseRev !== null
+            && body.baseRev !== room.rev) {
+          return json(res, 409, {
+            error: '這中間有人回報過，請合併後再送', stale: true,
+            rev: room.rev, state: room.state
+          });
         }
         const rev = room.rev + 1;
         await store.put(room.code, body.state, rev);

@@ -710,9 +710,17 @@ function paintNet(st) {
   var role = st.role;
   pill.hidden = (role === 'off');
   pill.className = 'netpill ' + (st.bad ? 'bad' : role);
+  /* 主控最在意的是「副控還在不在」—— 那件事不會有狀態變動來帶出來，
+     所以直接把連著的裝置數掛在角色徽章上。扣掉自己才是「別人」。 */
+  var others = Math.max(0, (st.clients || 0) - 1);
   pill.textContent = role === 'off' ? '' : ({
     host: '主控 ', guest: '副控 ', watch: '選手 '
-  }[role] || '') + st.code + (st.online ? '' : ' · 斷線');
+  }[role] || '') + st.code +
+    (role === 'host' && st.online ? '　+' + others + ' 臺' : '') +
+    (st.online ? '' : ' · 斷線');
+  pill.title = role === 'host'
+    ? '目前有 ' + others + ' 臺副控或選手連著（不含這一臺）'
+    : '';
 
   el('netOff').hidden = (role !== 'off');
   el('netOn').hidden = (role !== 'host');
@@ -723,6 +731,11 @@ function paintNet(st) {
     el('urlView').value = viewURL(net.viewCode);
     el('roomCode').value = net.code;
     el('viewCode').value = net.viewCode;
+    el('takeKey').value = net.takeoverKey;
+  }
+  el('adoptOut').hidden = (role !== 'host');
+  el('adoptOutHint').hidden = (role !== 'host');
+  if (role === 'host') {
     el('roomHint').innerHTML =
       '兩邊都不用打房號：副控貼網址、輸入密碼；選手掃 QR。<br>' +
       '房間會在最後一次操作的 36 小時後自動消失。';
@@ -1016,6 +1029,20 @@ el('btnJoin').onclick = function () {
     goTab('tPlay');
   }).catch(function (e) { toast('加入失敗：' + e.message, true); });
 };
+el('btnAdopt').onclick = function () {
+  var key = el('adoptKey').value.trim();
+  if (!key) { toast('先貼上接管碼', true); return; }
+  net.adopt(key).then(function (r) {
+    el('adoptKey').value = '';
+    /* 接管的是「連線」，不是「賽況」—— 賽況以這臺為準（多半是剛匯入的存檔），
+       接管之後推一次就把它同步上去，副控與選手會立刻跟上。 */
+    store.commit(function (s) {
+      s.room = { view: r.conn.viewCode, srv: (net.server !== DEFAULT_SERVER ? net.server : '') };
+    });
+    toast('接回房間 ' + r.conn.code + ' —— 副控密碼與選手 QR 都不用重發');
+  }).catch(function (e) { toast('接管失敗：' + e.message, true); });
+};
+
 el('btnLeave').onclick = function () {
   ask({ title: '離線？',
         body: '這臺會變回單機。副控跟選手的畫面不會再跟著你更新，成績都還在。',
@@ -1308,11 +1335,15 @@ function paintMatches(st) {
             '<div class="tb">' + esc(m.table) + '</div>';
     h += side(st, m, 'a', rm, bo, g);
     if (m.b === null || m.b === undefined) {
+      /* 輪空不能點，所以維持 div —— 按不下去的按鈕對鍵盤與螢幕閱讀器
+         都是雜訊，Tab 會停在一個什麼都不會發生的地方。 */
       h += '<div class="sd bye">輪空 · 視同勝</div>';
     } else {
-      h += '<div class="dw' + (m.result === 'draw' ? ' on' : '') + '" data-t="' +
-           esc(m.table) + '" data-r="draw">平手' +
-           (g.draw ? '<b class="gn">×' + g.draw + '</b>' : '') + '</div>' +
+      h += '<button type="button" class="dw' + (m.result === 'draw' ? ' on' : '') +
+           '" data-t="' + esc(m.table) + '" data-r="draw"' +
+           ' aria-label="第 ' + esc(m.table) + ' 桌　記一次平手"' +
+           ' aria-pressed="' + (m.result === 'draw') + '">平手' +
+           (g.draw ? '<b class="gn">×' + g.draw + '</b>' : '') + '</button>' +
            side(st, m, 'b', rm, bo, g);
       /* 退一局只在真的有東西可以退的時候出現 —— 空著的按鈕只會讓人以為壞了。
          一勝制不需要它：再點同一邊就是取消。 */
@@ -1333,16 +1364,25 @@ function pipsOf(bo, won) {
   return '<span class="pips">' + s + '</span>';
 }
 
+/* 真的用 <button>，不是長得像按鈕的 div ——
+   div 的 Tab 停不進去、螢幕閱讀器也不會唸出「這是可以按的」，
+   等於整個回報流程對鍵盤使用者不存在。
+   aria-pressed 讓輔助技術唸得出「已選取」，那是這個介面唯一的狀態。 */
 function side(st, m, which, rm, bo, g) {
   var id = which === 'a' ? m.a : m.b;
   var cls = 'sd';
-  if (m.result === which) cls += ' win';
+  var won = (m.result === which);
+  if (won) cls += ' win';
   else if (m.result && m.result !== 'draw' && m.result !== 'bye') cls += ' lose';
   var r = rm && rm[id];
-  return '<div class="' + cls + '" data-t="' + esc(m.table) + '" data-r="' + which + '">' +
+  var label = '第 ' + m.table + ' 桌　' + nameOf(st, id) +
+              ((bo || 1) > 1 ? '　記他贏一局' : '　記他贏');
+  return '<button type="button" class="' + cls + '" data-t="' + esc(m.table) +
+         '" data-r="' + which + '" aria-pressed="' + won + '"' +
+         ' aria-label="' + esc(label) + '">' +
          '<i>' + numOf(st, id) + '</i><span class="who">' + esc(nameOf(st, id)) + '</span>' +
          pipsOf(bo || 1, which === 'a' ? g.a : g.b) +
-         (r ? '<span class="rec num">' + r.rec + '</span>' : '') + '</div>';
+         (r ? '<span class="rec num">' + r.rec + '</span>' : '') + '</button>';
 }
 
 /* 排名表 */
@@ -1641,6 +1681,74 @@ addEventListener('hashchange', function () {
    但這三個純粹是抬頭文字，改了就該馬上出現在投影與選手手機上 ——
    不然填了主辦單位卻看不到任何變化，只會以為沒存到。
    用 change 而不是 input：一次編輯推一次，不必每個字都推伺服器。 */
+/* ── 鍵盤操作 ─────────────────────────────────────────
+   32 桌以上時，用滑鼠在長列表裡找桌號比想像中慢，而回報是整場重複
+   最多次的動作。三個鍵就夠：
+
+     數字／字母　跳到那一桌並把焦點放在左邊那位（連打兩位數也認得，
+                 「1」再「2」是第 12 桌，不是先跳 1 再跳 2）
+     ← →　　　　在同一張卡的「左 · 平手 · 右」之間移動
+     Backspace　退這一桌的最後一局
+
+   按 Enter／空白鍵回報是瀏覽器本來就有的 —— 那三格現在是真的按鈕，
+   所以不必自己實作，也才不會跟輔助技術打架。 */
+var jumpBuf = '', jumpTimer = null;
+
+function focusTable(name) {
+  var card = null;
+  document.querySelectorAll('#matchList .mt').forEach(function (el2) {
+    var b = el2.querySelector('[data-t]');
+    if (b && b.dataset.t === name) card = el2;
+  });
+  if (!card) return false;
+  card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  var first = card.querySelector('button[data-r]');
+  if (first) first.focus();
+  return true;
+}
+
+document.addEventListener('keydown', function (e) {
+  if (!el('tPlay').classList.contains('on')) return;
+  if (document.body.classList.contains('present')) return;
+  var t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  var card = t && t.closest ? t.closest('.mt') : null;
+
+  if (e.key === 'Backspace' && card) {
+    var u = card.querySelector('.undo');
+    e.preventDefault();
+    if (u) reportGame(u.dataset.t, null);
+    else toast('一勝制不用退局 —— 再點同一邊就是取消', true);
+    return;
+  }
+
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && card) {
+    var btns = [].slice.call(card.querySelectorAll('button[data-r]'));
+    var i = btns.indexOf(t);
+    if (i < 0) return;
+    e.preventDefault();
+    var next = btns[i + (e.key === 'ArrowRight' ? 1 : -1)];
+    if (next) next.focus();
+    return;
+  }
+
+  if (e.key === 'Escape') { jumpBuf = ''; return; }
+
+  /* 桌號可能是數字，也可能是字母或自訂的 Q1，所以不限定字元集 */
+  if (e.key.length !== 1 || !/[0-9A-Za-z]/.test(e.key)) return;
+  e.preventDefault();
+  jumpBuf += e.key.toUpperCase();
+  clearTimeout(jumpTimer);
+  jumpTimer = setTimeout(function () { jumpBuf = ''; }, 900);
+  if (!focusTable(jumpBuf)) {
+    /* 這一串沒有對應的桌，退回只用最後一個字再試一次 */
+    if (jumpBuf.length > 1 && focusTable(e.key.toUpperCase())) jumpBuf = e.key.toUpperCase();
+    else toast('沒有第 ' + jumpBuf + ' 桌', true);
+  }
+});
+
 /* 搜尋與排序：只改看到的東西，不動狀態，所以直接重畫就好。
    搜尋用 input 即時反應 —— 現場是「有人站在旁邊等」的情境。 */
 el('playFind').oninput = function () { render(store.get()); };

@@ -69,6 +69,8 @@ function create(opts) {
   var lastRev = 0;
   var online = false;
   var pushing = false, pushAgain = false;
+  var baseline = null;          /* 上一次成功推上去的那一份，合併時當基準 */
+  var clients = 0;              /* 這個房間目前有幾臺連著（含自己） */
 
   var on = {
     state: opts.onState || function () {},
@@ -93,7 +95,7 @@ function create(opts) {
 
   function status(msg, bad) {
     on.status({ role: conn ? conn.role : 'off', code: conn ? conn.code : '',
-                online: online, msg: msg || '', bad: !!bad });
+                online: online, clients: clients, msg: msg || '', bad: !!bad });
   }
   /* 回應一定要是 JSON 物件才算數。
      不檢查的話，任何中間層（Service Worker 的離線後備、公共 Wi-Fi 的
@@ -120,9 +122,45 @@ function create(opts) {
     }).then(function (j) {
       conn = { code: j.code, viewCode: j.viewCode, hostToken: j.hostToken, role: 'host' };
       saveConn(conn, opts.offline); lastRev = j.rev; online = true;
+      snapshot(state);
       listen();
       status('已開房 ' + j.code);
       return conn;
+    });
+  }
+
+  /* ── 接管碼 ────────────────────────────────────────
+     主控權限（hostToken）只存在開房那個分頁裡，不在匯出的存檔中。
+     電腦沒電、瀏覽器資料被清、分頁被系統回收 —— 房間就再也推不動了，
+     只能重開房、重發副控密碼與選手 QR。
+
+     接管碼把「房號 + 鑰匙」包成一串字，抄在手機備忘錄或另一臺電腦上，
+     就救得回來。刻意做成要自己按「複製」才拿得到，不自動塞進存檔 ——
+     存檔會被轉傳，鑰匙不該跟著跑。 */
+  function takeoverKey() {
+    if (!conn || conn.role !== 'host') return '';
+    try {
+      return 'NP1.' + btoa(unescape(encodeURIComponent(
+        JSON.stringify({ c: conn.code, v: conn.viewCode || '', t: conn.hostToken }))));
+    } catch (e) { return ''; }
+  }
+
+  function adopt(key) {
+    var raw = String(key || '').trim();
+    if (raw.indexOf('NP1.') !== 0) return Promise.reject(new Error('這不像接管碼，開頭應該是 NP1.'));
+    var d;
+    try {
+      d = JSON.parse(decodeURIComponent(escape(atob(raw.slice(4)))));
+    } catch (e) { return Promise.reject(new Error('接管碼壞掉了，可能複製時少了幾個字')); }
+    if (!d || !d.c || !d.t) return Promise.reject(new Error('接管碼裡沒有房號或鑰匙'));
+
+    return api('/api/rooms/' + d.c).then(function (j) {
+      conn = { code: d.c, viewCode: d.v || '', hostToken: d.t, role: 'host' };
+      saveConn(conn, opts.offline);
+      lastRev = j.rev; online = true; baseline = null;
+      listen();
+      status('已接管房間 ' + d.c);
+      return { conn: conn, state: j.state };
     });
   }
 
@@ -165,8 +203,12 @@ function create(opts) {
         es.onmessage = function (e) {
           var j;
           try { j = JSON.parse(e.data); } catch (err) { return; }
-          if (!j || j.rev === undefined) return;
+          if (!j) return;
           online = true;
+          if (typeof j.clients === 'number') clients = j.clients;
+          /* 有人接上或斷線的通知，沒有帶狀態 —— 只要更新人數就好 */
+          if (j.presence) { status(''); return; }
+          if (j.rev === undefined) return;
           if (localAhead()) return;                  /* 這是自己的舊回音 */
           if (j.rev <= lastRev) return;
           lastRev = j.rev;
@@ -194,6 +236,7 @@ function create(opts) {
     if (!conn) return;
     api('/api/rooms/' + conn.code).then(function (j) {
       online = true;
+      if (typeof j.clients === 'number') clients = j.clients;
       if (!localAhead() && j.rev > lastRev) { lastRev = j.rev; on.state(j.state, conn.role); }
       status('');
     }).catch(function () { online = false; status('連不到伺服器', true); });
@@ -201,22 +244,65 @@ function create(opts) {
 
   /* ── 送 ────────────────────────────────────────── */
 
-  /* 主控推整份狀態。連續改動只送最後一次，避免洗版。 */
+  /* 主控推整份狀態。連續改動只送最後一次，避免洗版。
+
+     帶上 baseRev＝「我是根據哪一版改的」。伺服器版本對不上就回 409 ——
+     代表這中間有副控回報了一桌，直接蓋下去那一筆會消失。
+     這時候把現況拿回來合併（規則在 engine.mergeResults）再推一次。 */
   function pushState(state) {
     if (!conn || conn.role !== 'host') return Promise.resolve();
     if (pushing) { pushAgain = true; return Promise.resolve(); }
     pushing = true;
-    return api('/api/rooms/' + conn.code + '/state', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hostToken: conn.hostToken, state: state })
-    }).then(function (j) {
-      lastRev = j.rev; online = true; status('');
-    }).catch(function (e) {
-      online = false; status('推送失敗：' + e.message, true);
-    }).then(function () {
+    return send(state, lastRev, 0).then(function () {
       pushing = false;
       if (pushAgain) { pushAgain = false; pushState(state); }
     });
+  }
+
+  function send(state, baseRev, depth) {
+    return fetch(base + '/api/rooms/' + conn.code + '/state', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostToken: conn.hostToken, state: state, baseRev: baseRev })
+    }).then(function (r) {
+      return r.text().then(function (body) {
+        var j = null;
+        try { j = JSON.parse(body); } catch (e) { j = null; }
+        if (r.status === 409 && j && j.stale) {
+          /* 只讓它重試兩次。一直撞代表現場有人在狂點，
+             這時候與其無限迴圈，不如把畫面交回去讓人看一眼。 */
+          if (depth >= 2) { status('伺服器上有比較新的回報，已改用伺服器版本', true);
+                            lastRev = j.rev; on.state(j.state, conn.role); return; }
+          var merged = mergeIn(state, j.state);
+          lastRev = j.rev;
+          if (merged.adopted.length) {
+            status('收到副控回報的第 ' + merged.adopted.join('、') + ' 桌，已併入');
+          }
+          return send(state, j.rev, depth + 1);
+        }
+        if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+        if (!j || typeof j !== 'object') throw new Error('伺服器回的不是 JSON');
+        lastRev = j.rev; online = true; snapshot(state); status('');
+      });
+    }).catch(function (e) {
+      online = false; status('推送失敗：' + e.message, true);
+    });
+  }
+
+  /* 合併規則只有 engine.js 一份。連線層不懂賽制，也不該懂。
+
+     基準是「我上次成功推上去的那一份」—— 有它才分得出
+     「這一桌是對面改的」還是「這一桌是我自己取消的」。 */
+  function engine() {
+    if (typeof self !== 'undefined' && self.Engine) return self.Engine;
+    try { return require('./engine.js'); } catch (e) { return null; }
+  }
+  function snapshot(state) {
+    try { baseline = JSON.parse(JSON.stringify(state)); } catch (e) { baseline = null; }
+  }
+  function mergeIn(mine, theirs) {
+    var E = engine();
+    if (!E || !E.mergeResults) return { state: mine, adopted: [] };
+    return E.mergeResults(mine, theirs, baseline);
   }
 
   /* 加入者回報一整場的小局。BO 的規則只有 engine.js 一份，
@@ -278,8 +364,11 @@ function create(opts) {
     get code() { return conn ? conn.code : ''; },
     get viewCode() { return conn ? (conn.viewCode || '') : ''; },
     get online() { return online; },
+    get clients() { return clients; },
     get server() { return base; },
+    get takeoverKey() { return takeoverKey(); },
     setServer: function (u) { base = String(u || '').replace(/\/+$/, ''); },
+    adopt: adopt,
     host: host, join: join, leave: leave, resume: resume,
     pushState: pushState, sendResult: sendResult, sendMatch: sendMatch, refresh: pullOnce
   };
