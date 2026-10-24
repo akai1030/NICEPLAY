@@ -12,6 +12,7 @@
 #   view    控制台三頁的 HTML 片段：名單、桌數提示、賽事清單、對戰卡、名次表、桌卡
 #   watch   選手手機那一頁：我在第幾桌、比分站在誰那邊、我的每一輪、名次
 #   present 投影：回報進度、預計結束時間、欄數與字級、對戰表、名次
+#   card    賽後成績單：每一輪那幾行、名次與戰績畫在哪裡（假的 2D context）
 #   server  房間伺服器的 HTTP 行為與權限
 #   net     連線層，拿真的 net.js 對真的伺服器跑
 #   check   結構性問題：標籤沒閉合、id 重複、版本章沒對齊、字級破規範
@@ -21,7 +22,7 @@ cd "$(dirname "$0")/.."
 fail=0
 n=0
 for t in test/engine.test.js test/bo.test.js test/pairing.test.js test/double.test.js test/store.test.js \
-         test/fmt.test.js test/csv.test.js test/view.test.js test/watch.test.js test/present.test.js \
+         test/fmt.test.js test/csv.test.js test/view.test.js test/watch.test.js test/present.test.js test/card.test.js \
          server/test.js test/net.test.js test/check.js; do
   printf '\n════ %s ════\n' "$t"
   n=$((n + 1))

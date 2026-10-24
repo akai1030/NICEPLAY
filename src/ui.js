@@ -65,7 +65,8 @@ var net = window.Net.create({
 
 /* ── 小工具 ───────────────────────────────────────────
    純函式在 fmt.js；這裡用同名的變數接過來，下面的寫法照舊。 */
-var F = window.Fmt, C = window.Csv, V = window.View, Wt = window.Watch, Pv = window.Present;
+var F = window.Fmt, C = window.Csv, V = window.View, Wt = window.Watch, Pv = window.Present,
+    Card = window.Card;
 var esc = F.esc, pad = F.pad, fmtCount = F.fmtCount, nameOf = F.nameOf, numOf = F.numOf,
     recMap = F.recMap, currentRound = F.currentRound, matchesOf = F.matchesOf,
     roundLabel = F.roundLabel, formatLabel = F.formatLabel, fileStem = F.fileStem,
@@ -994,111 +995,9 @@ function paintWatch(st) {
 }
 
 /* ── 賽後成績單 ───────────────────────────────────────
-   選手會自己轉發的東西 —— 對店家等於免費宣傳，所以主辦單位要在上面。
-   用 Canvas 畫而不是截圖：截圖會把手機的狀態列、瀏覽器網址列一起帶進去，
-   而且每支手機的比例都不一樣。這裡固定 1080×1350（IG 直式），
-   誰的手機畫出來都一樣。 */
+   怎麼畫在 card.js；這裡只負責找到那張畫布。 */
 function drawCard(st, me) {
-  var cv = el('wtCard'), g = cv.getContext('2d');
-  var W = cv.width, H = cv.height;
-  var dark = st.theme !== 'light';
-  var bg = dark ? '#0B0D12' : '#FFFFFF';
-  var fg = dark ? '#FFFFFF' : '#0B0D12';
-  var dim = dark ? 'rgba(255,255,255,.62)' : 'rgba(11,13,18,.62)';
-  var line = dark ? 'rgba(255,255,255,.16)' : 'rgba(11,13,18,.14)';
-  var CN = '"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
-  var MO = '"SF Mono",Menlo,Consolas,monospace';
-
-  g.fillStyle = bg; g.fillRect(0, 0, W, H);
-
-  /* 頂部品牌漸層條 —— 全站唯一用漸層的地方，成績單也照這條規矩 */
-  var grad = g.createLinearGradient(0, 0, W, 0);
-  grad.addColorStop(0, '#2563FF'); grad.addColorStop(.52, '#A855F7');
-  grad.addColorStop(1, '#FF2ED1');
-  g.fillStyle = grad; g.fillRect(0, 0, W, 16);
-
-  var rows = E.standings(st.players, st.matches, st.config.rules);
-  var mine = null;
-  rows.forEach(function (r) { if (r.id === me.id) mine = r; });
-  if (!mine) return;
-
-  var y = 120;
-  g.textAlign = 'left';
-  g.fillStyle = dim; g.font = '34px ' + CN;
-  g.fillText([st.event.host, st.event.name].filter(Boolean).join('　·　') || 'NICEPLAY', 80, y);
-  y += 54;
-  g.fillStyle = dim; g.font = '30px ' + MO;
-  g.fillText(st.event.date || '', 80, y);
-
-  /* 名次：整張圖最大的一個數字 */
-  y += 170;
-  g.fillStyle = fg; g.font = '900 220px ' + MO;
-  g.fillText(String(mine.rank), 80, y);
-  var w = g.measureText(String(mine.rank)).width;
-  g.fillStyle = dim; g.font = '44px ' + CN;
-  g.fillText('名', 80 + w + 20, y);
-
-  y += 90;
-  g.fillStyle = fg; g.font = '900 76px ' + CN;
-  g.fillText(me.name, 80, y);
-  if (me.team) {
-    y += 52;
-    g.fillStyle = dim; g.font = '36px ' + CN;
-    g.fillText(me.team, 80, y);
-  }
-
-  y += 80;
-  g.strokeStyle = line; g.lineWidth = 2;
-  g.beginPath(); g.moveTo(80, y); g.lineTo(W - 80, y); g.stroke();
-
-  /* 三個數字並排 */
-  y += 100;
-  var stats = [
-    [mine.w + '-' + mine.l + (mine.d ? '-' + mine.d : ''), '戰績'],
-    [String(mine.pts), '積分'],
-    [(mine.omw * 100).toFixed(1), 'OMW%']
-  ];
-  stats.forEach(function (s, i) {
-    var x = 80 + i * ((W - 160) / 3);
-    g.fillStyle = fg; g.font = '700 68px ' + MO;
-    g.fillText(s[0], x, y);
-    g.fillStyle = dim; g.font = '30px ' + CN;
-    g.fillText(s[1], x, y + 44);
-  });
-
-  /* 每一輪打了誰 */
-  y += 130;
-  g.fillStyle = dim; g.font = '30px ' + MO;
-  g.fillText('EVERY ROUND', 80, y);
-  y += 20;
-  var mineMs = st.matches.filter(function (m) { return m.a === me.id || m.b === me.id; });
-  mineMs.slice(0, 9).forEach(function (m) {
-    y += 62;
-    var bye = (m.b === null || m.b === undefined);
-    var iAmA = (m.a === me.id);
-    var opp = bye ? '—' : nameOf(st, iAmA ? m.b : m.a);
-    var gm = E.tallyGames(E.gamesOf(m));
-    var tag = bye ? (m.result === 'noshow' ? '未到' : '輪空')
-            : !m.result ? '進行中'
-            : m.result === 'draw' ? '平手'
-            : (((m.result === 'a') === iAmA) ? '勝' : '敗');
-    g.fillStyle = dim; g.font = '34px ' + MO;
-    g.fillText(String(roundLabel(m.round)), 80, y);
-    g.fillStyle = fg; g.font = '38px ' + CN;
-    g.fillText(opp, 260, y);
-    g.textAlign = 'right';
-    if (!bye && (m.bo || 1) > 1) {
-      g.fillStyle = dim; g.font = '32px ' + MO;
-      g.fillText(iAmA ? gm.a + '-' + gm.b : gm.b + '-' + gm.a, W - 200, y);
-    }
-    g.fillStyle = (tag === '勝') ? '#FF2ED1' : dim;
-    g.font = '700 36px ' + CN;
-    g.fillText(tag, W - 80, y);
-    g.textAlign = 'left';
-  });
-
-  g.fillStyle = dim; g.font = '28px ' + MO;
-  g.fillText('NICEPLAY · niceplay.transtation.org', 80, H - 60);
+  Card.draw(el('wtCard'), st, me);
 }
 
 el('btnWtCard').onclick = function () {
