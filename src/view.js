@@ -15,12 +15,16 @@
 var esc = F.esc, eventTitle = F.eventTitle, nameOf = F.nameOf, numOf = F.numOf,
     byTableName = F.byTableName, matchMatches = F.matchMatches, norm = F.norm;
 
+/* 副控的狀態是房間伺服器推來的。入口（store.replace）已經整理過一次，
+   這裡拼 HTML 時再擋一道：字串（含 id）一律 esc()，數字欄位一律 Number()。
+   numOf() 找不到人時回空字串，Number('') 會變成 0，所以它用 esc() 而不是 Number()。 */
+
 /* ── 設定頁 ─────────────────────────────────────────── */
 
 /* 名單一人一格。設定頁的「名單」與對戰頁還沒開賽時的那一份長得一樣 */
 function rosterHTML(list) {
   return list.map(function (p) {
-    return '<div class="nm' + (p.dropped ? ' out' : '') + '"><i>' + p.no + '</i>' +
+    return '<div class="nm' + (p.dropped ? ' out' : '') + '"><i>' + Number(p.no) + '</i>' +
            '<span>' + esc(p.name) + '</span></div>';
   }).join('');
 }
@@ -49,7 +53,7 @@ function eventOptionsHTML(st, lib) {
 
 function eventHintHTML(others) {
   return others
-    ? '另外還有 <b>' + others + '</b> 場存在這臺電腦裡。切換不會動到任何一場的成績。'
+    ? '另外還有 <b>' + Number(others) + '</b> 場存在這臺電腦裡。切換不會動到任何一場的成績。'
     : '目前只有這一場。按「新增一場」會把現在這場收起來，開一個全新的。';
 }
 
@@ -91,7 +95,7 @@ function matchCardHTML(st, m, rm, me) {
          '" data-t="' + esc(m.table) + '" data-r="draw"' +
          ' aria-label="第 ' + esc(m.table) + ' 桌　記一次平手"' +
          ' aria-pressed="' + (m.result === 'draw') + '">平手' +
-         (g.draw ? '<b class="gn">×' + g.draw + '</b>' : '') + '</button>' +
+         (g.draw ? '<b class="gn">×' + Number(g.draw) + '</b>' : '') + '</button>' +
          side(st, m, 'b', rm, bo, g);
     /* 退一局只在真的有東西可以退的時候出現 —— 空著的按鈕只會讓人以為壞了。
        一勝制不需要它：再點同一邊就是取消。 */
@@ -131,9 +135,9 @@ function side(st, m, which, rm, bo, g) {
   return '<button type="button" class="' + cls + '" data-t="' + esc(m.table) +
          '" data-r="' + which + '" data-id="' + esc(id) + '" aria-pressed="' + won + '"' +
          ' aria-label="' + esc(label) + '">' +
-         '<i>' + numOf(st, id) + '</i><span class="who">' + esc(nameOf(st, id)) + '</span>' +
+         '<i>' + esc(numOf(st, id)) + '</i><span class="who">' + esc(nameOf(st, id)) + '</span>' +
          pipsOf(bo || 1, which === 'a' ? g.a : g.b) +
-         (r ? '<span class="rec num">' + r.rec + '</span>' : '') + '</button>';
+         (r ? '<span class="rec num">' + esc(r.rec) + '</span>' : '') + '</button>';
 }
 
 /* ── 排名頁 ─────────────────────────────────────────── */
@@ -191,20 +195,20 @@ function rankTableHTML(st, players, matches, q, raw) {
     var podium = played && !r.dropped && idx > -1 && idx < 4;
     h += '<tr class="' + (inCut ? 'cut ' : '') + (cut && idx === cut - 1 ? 'cutline ' : '') +
          (podium ? 'top4 ' : '') + (r.dropped ? 'out' : '') + '">' +
-         '<td class="rk">' + r.rank + '</td>' +
-         '<td class="l"><div class="nmcell"><i>' + r.no + '</i>' + esc(r.name) +
-           (r.byes ? ' <span style="color:var(--dim);font-size:12px">輪空' + r.byes + '</span>' : '') +
+         '<td class="rk">' + Number(r.rank) + '</td>' +
+         '<td class="l"><div class="nmcell"><i>' + Number(r.no) + '</i>' + esc(r.name) +
+           (r.byes ? ' <span style="color:var(--dim);font-size:12px">輪空' + Number(r.byes) + '</span>' : '') +
          '</div>' +
          /* 手機上右邊兩欄放不下，同一組數字改掛在名字底下 ——
             同分的時候，看的人要能自己看出憑什麼是這個順序。 */
          (played ? '<div class="tbk">OMW ' + (r.omw * 100).toFixed(1) +
                    '%　OOMW ' + (r.oomw * 100).toFixed(1) + '%</div>' : '') +
          '</td>' +
-         '<td>' + r.w + '-' + r.l + (r.d ? '-' + r.d : '') + '</td>' +
-         '<td class="pt">' + r.pts + '</td>' +
+         '<td>' + Number(r.w) + '-' + Number(r.l) + (r.d ? '-' + Number(r.d) : '') + '</td>' +
+         '<td class="pt">' + Number(r.pts) + '</td>' +
          '<td>' + (r.omw * 100).toFixed(1) + '</td>' +
          '<td>' + (r.oomw * 100).toFixed(1) + '</td>' +
-         '<td><button class="dropb' + (r.dropped ? ' on' : '') + '" data-id="' + r.id + '">' +
+         '<td><button class="dropb' + (r.dropped ? ' on' : '') + '" data-id="' + esc(r.id) + '">' +
            (r.dropped ? '已退賽' : '退賽') + '</button></td></tr>';
   });
   return h + '</tbody></table>';
@@ -225,9 +229,9 @@ function tentsHTML(st, ms) {
     return '<div class="tent">' +
       '<div class="tent-hd">' + esc(head) + '<b>' + esc(F.roundLabel(m.round)) + '</b></div>' +
       '<div class="tent-no">' + esc(m.table) + '</div>' +
-      '<div class="tent-p"><i>' + numOf(st, m.a) + '</i>' + esc(nameOf(st, m.a)) + '</div>' +
-      '<div class="tent-vs">VS' + (bo > 1 ? '　·　BO' + bo + '　先贏 ' + E.winsNeeded(bo) + ' 局' : '') + '</div>' +
-      '<div class="tent-p"><i>' + numOf(st, m.b) + '</i>' + esc(nameOf(st, m.b)) + '</div>' +
+      '<div class="tent-p"><i>' + esc(numOf(st, m.a)) + '</i>' + esc(nameOf(st, m.a)) + '</div>' +
+      '<div class="tent-vs">VS' + (bo > 1 ? '　·　BO' + Number(bo) + '　先贏 ' + Number(E.winsNeeded(bo)) + ' 局' : '') + '</div>' +
+      '<div class="tent-p"><i>' + esc(numOf(st, m.b)) + '</i>' + esc(nameOf(st, m.b)) + '</div>' +
       '</div>';
   }).join('');
 }

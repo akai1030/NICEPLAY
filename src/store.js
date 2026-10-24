@@ -128,11 +128,104 @@ function create() {
       var b = blank(); Object.keys(state).forEach(function (k) { delete state[k]; });
       Object.keys(b).forEach(function (k) { state[k] = b[k]; });
     }); },
-    replace: function (next) { return commit(function () {
+    /* 整份換掉。會走這裡的都是「不是這個視窗自己算出來的」狀態：
+       房間伺服器推來的（net.onState）、匯入的存檔、賽事清單切換、還原點。
+       所以先過一次 clean，再放進來。 */
+    replace: function (next) { next = clean(next); return commit(function () {
       Object.keys(state).forEach(function (k) { delete state[k]; });
       Object.keys(next).forEach(function (k) { state[k] = next[k]; });
     }); }
   };
+}
+
+/* ── 從外面進來的狀態先整理一次 ────────────────────────
+   副控與選手手機上的狀態是主辦那臺經房間伺服器推過來的，匯入的存檔是
+   別人給的檔案。畫面拼 HTML 的時候名字、桌號有跳脫，但 id 進 data-id、
+   編號與積分是直接拼的 —— 這兩類東西只要被動過手腳就能塞進標籤。
+
+   做法是在入口擋：
+     · 選手的 id、對戰的 a／b 只留 [A-Za-z0-9_-]，不合格的那一筆整筆丟掉
+       （id 是 uid() 產生的，正常的存檔一定合格）
+     · 編號、幾勝制、輪次（數字的那種）、各種設定數字一律轉成整數
+     · 勝負只認 a／b／draw／bye／noshow，逐局只認 a／b／draw
+     · 名字、隊伍、桌號維持字串
+   正常的資料整理完一模一樣（同一個物件、欄位不增不減），
+   所以存檔匯出的內容不會因為經過這裡而改變。
+   積分、名次、勝敗和是 engine 從上面這些算出來的，入口擋住就跟著是數字；
+   畫面那一端（view.js、watch.js、present.js）另外再用 Number()／esc() 擋第二道。 */
+var SAFE_ID = /^[\w-]+$/;
+var RESULTS = { a: 1, b: 1, draw: 1, bye: 1, noshow: 1 };
+var GAMES = { a: 1, b: 1, draw: 1 };
+
+function safeId(v) { return typeof v === 'string' && SAFE_ID.test(v); }
+function toInt(v, dflt) {
+  var n = Number(v);
+  if (!isFinite(n)) return dflt;
+  return n < 0 ? Math.ceil(n) : Math.floor(n);
+}
+function toNum(v, dflt) { var n = Number(v); return isFinite(n) ? n : dflt; }
+/* 有這個欄位而且型別不對才動它 —— 沒有的欄位不要補，不然匯出的檔案會多出欄位 */
+function intField(o, k, dflt) { if (o[k] !== undefined && o[k] !== null && o[k] !== toInt(o[k], dflt)) o[k] = toInt(o[k], dflt); }
+function numField(o, k, dflt) { if (o[k] !== undefined && o[k] !== null && o[k] !== toNum(o[k], dflt)) o[k] = toNum(o[k], dflt); }
+function strField(o, k) { if (o[k] !== undefined && o[k] !== null && typeof o[k] !== 'string') o[k] = String(o[k]); }
+
+function clean(s) {
+  if (!s || typeof s !== 'object') return s;
+  if (s.id !== undefined && !safeId(s.id)) s.id = uid();
+  intField(s, 'rev', 0);
+  strField(s, 'theme'); strField(s, 'phase');
+
+  if (s.event && typeof s.event === 'object') {
+    strField(s.event, 'name'); strField(s.event, 'date'); strField(s.event, 'host');
+  }
+
+  var c = s.config;
+  if (c && typeof c === 'object') {
+    ['rounds', 'cut', 'bo', 'boKO', 'minutes', 'tableCount', 'groups'].forEach(function (k) { intField(c, k, 0); });
+    ['format', 'tableNaming', 'liveTable', 'lateJoin'].forEach(function (k) { strField(c, k); });
+    if (c.customTables !== undefined && !Array.isArray(c.customTables)) c.customTables = [];
+    if (Array.isArray(c.customTables)) c.customTables.forEach(function (t, i) { strField(c.customTables, i); });
+    if (c.rules && typeof c.rules === 'object') {
+      numField(c.rules, 'win', 3); numField(c.rules, 'draw', 1);
+      numField(c.rules, 'loss', 0); numField(c.rules, 'minWinPct', 0.25);
+    }
+  }
+
+  if (Array.isArray(s.players)) {
+    s.players = s.players.filter(function (p) { return p && typeof p === 'object' && safeId(p.id); });
+    s.players.forEach(function (p, i) {
+      intField(p, 'no', i + 1);
+      strField(p, 'name'); strField(p, 'team'); strField(p, 'group');
+    });
+  }
+
+  if (Array.isArray(s.matches)) {
+    s.matches = s.matches.filter(function (m) {
+      return m && typeof m === 'object' && safeId(m.a) &&
+             (m.b === null || m.b === undefined || safeId(m.b));
+    });
+    s.matches.forEach(function (m) {
+      if (typeof m.round === 'number') intField(m, 'round', 0); else strField(m, 'round');
+      strField(m, 'table');
+      intField(m, 'bo', 1);
+      if (m.games !== undefined && m.games !== null) {
+        if (!Array.isArray(m.games)) m.games = [];
+        else if (m.games.some(function (g) { return !GAMES[g]; })) {
+          m.games = m.games.filter(function (g) { return GAMES[g]; });
+        }
+      }
+      if (m.result !== undefined && m.result !== null && !RESULTS[m.result]) m.result = null;
+    });
+  }
+
+  var t = s.timer;
+  if (t && typeof t === 'object') {
+    numField(t, 'endsAt', 0); numField(t, 'remainMs', 0); numField(t, 'durMs', 0);
+  }
+  /* 選手查詢碼會拼進網址與 QR，一樣只留安全字元；不合格就當成沒開房 */
+  if (s.room && (typeof s.room !== 'object' || !safeId(s.room.view))) s.room = null;
+  if (s.room) strField(s.room, 'srv');
+  return s;
 }
 
 /* ── 還原點 ───────────────────────────────────────────
@@ -274,7 +367,7 @@ function parsePlayers(text) {
 }
 
 return {
-  KEY: KEY, blank: blank, create: create, uid: uid,
+  KEY: KEY, blank: blank, create: create, uid: uid, clean: clean,
   save: save, load: load, toJSON: toJSON, fromJSON: fromJSON,
   saveUndo: saveUndo, loadUndo: loadUndo, clearUndo: clearUndo,
   LIB: LIB, libLoad: libLoad, libStash: libStash, libTake: libTake, libDrop: libDrop,

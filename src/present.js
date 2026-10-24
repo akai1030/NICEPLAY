@@ -14,6 +14,10 @@
 
 var esc = F.esc, pad = F.pad, nameOf = F.nameOf, numOf = F.numOf, roundLabel = F.roundLabel;
 
+/* 投影窗的狀態是控制台傳過來的，控制台又可能是收房間伺服器推來的。
+   入口（store.replace）已經整理過一次，這裡拼 HTML 時再擋一道：
+   字串一律 esc()，數字欄位一律 Number()（numOf 找不到人回空字串，所以用 esc）。 */
+
 /* 左上角那個小標：R3、四強 */
 function tagText(r) {
   return r === null ? '—' : (typeof r === 'number' ? 'R' + r : r.replace('賽', ''));
@@ -150,12 +154,12 @@ function line(st, m, which, f, rank) {
   if (bo > 1) {
     var g = E.tallyGames(E.gamesOf(m));
     gm = '<b class="gm" style="font-size:' + (f * .72) + 'vw">' +
-         (which === 'a' ? g.a : g.b) + '</b>';
+         Number(which === 'a' ? g.a : g.b) + '</b>';
   }
   return '<div class="' + cls + '" style="font-size:' + f + 'vw">' +
-         '<i style="font-size:' + (f * .74) + 'vw">' + numOf(st, id) + '</i>' +
+         '<i style="font-size:' + (f * .74) + 'vw">' + esc(numOf(st, id)) + '</i>' +
          '<span class="nm2">' + esc(nameOf(st, id)) + '</span>' + gm + tag +
-         '<span class="rec" style="font-size:' + (f * .6) + 'vw">' + (rank[id] || '') + '</span></div>';
+         '<span class="rec" style="font-size:' + (f * .6) + 'vw">' + esc(rank[id] || '') + '</span></div>';
 }
 
 /* ── 名次 ─────────────────────────────────────────────
@@ -181,11 +185,11 @@ function rankHTML(st, vh) {
     h += '<div class="pv-rk' + (cut && played && r.rank <= cut ? ' in' : '') +
          (podium ? ' top4' : '') + (r.dropped ? ' out' : '') +
          '" style="padding:' + (f * .16) + 'vw ' + (f * .6) + 'vw">' +
-         '<b style="font-size:' + (f * 1.15) + 'vw;flex-basis:' + (f * 1.8) + 'vw">' + r.rank + '</b>' +
-         '<i style="font-size:' + (f * .56) + 'vw">' + r.no + '</i>' +
+         '<b style="font-size:' + (f * 1.15) + 'vw;flex-basis:' + (f * 1.8) + 'vw">' + Number(r.rank) + '</b>' +
+         '<i style="font-size:' + (f * .56) + 'vw">' + Number(r.no) + '</i>' +
          '<span style="font-size:' + f + 'vw">' + esc(r.name) + '</span>' +
-         '<em style="font-size:' + (f * .62) + 'vw">' + r.w + '-' + r.l + (r.d ? '-' + r.d : '') + '</em>' +
-         '<u style="font-size:' + (f * 1.05) + 'vw;flex-basis:' + (f * 1.9) + 'vw">' + r.pts + '</u></div>';
+         '<em style="font-size:' + (f * .62) + 'vw">' + Number(r.w) + '-' + Number(r.l) + (r.d ? '-' + Number(r.d) : '') + '</em>' +
+         '<u style="font-size:' + (f * 1.05) + 'vw;flex-basis:' + (f * 1.9) + 'vw">' + Number(r.pts) + '</u></div>';
   });
   return h + '</div>';
 }

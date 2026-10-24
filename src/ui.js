@@ -56,7 +56,8 @@ var net = window.Net.create({
   server: localStorage.getItem(SRV_KEY) || DEFAULT_SERVER,
   onState: function (remote, role) {
     /* 伺服器來的整份狀態直接取代本機。主控與加入者都吃這條，
-       所以「傳整份快照」的自癒特性在兩邊都成立。 */
+       所以「傳整份快照」的自癒特性在兩邊都成立。
+       store.replace 會先用 store.js 的 clean 整理過（壞 id 丟掉、數字轉整數）。 */
     applyingRemote = true;
     try { store.replace(remote); } finally { applyingRemote = false; }
   },

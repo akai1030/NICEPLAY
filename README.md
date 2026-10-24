@@ -177,7 +177,7 @@ E.playGame(match, 'a');                 // { games, result } | null（這一下�
 ## 測試
 
 ```bash
-sh tools/test.sh            # 一次跑完下面十五組（push 時 GitHub Actions 也會跑）
+sh tools/test.sh            # 一次跑完下面十六組（push 時 GitHub Actions 也會跑）
 
 node test/engine.test.js    # 引擎 11 組　　賽制算得對不對
 node test/bo.test.js        # 幾勝制 12 組　含「小局不影響名次」那條界線
@@ -191,6 +191,7 @@ node test/watch.test.js     # 選手畫面 6 組　我在第幾桌、比分方�
 node test/present.test.js   # 投影 5 組　　　回報進度、預計結束時間、欄數、對戰表、名次
 node test/card.test.js      # 成績單 3 組　　每一輪那幾行、名次與戰績畫在哪（假的 2D context）
 node test/patch.test.js     # 局部更新 5 組　結果跟 innerHTML 一樣、沒變的節點留著
+node test/clean.test.js     # 外來狀態 4 組　壞 id 丟掉、數字轉整數，三個畫面都拼不出標籤
 node server/test.js         # 伺服器 10 組　HTTP 行為與權限
 node test/net.test.js       # 連線層 8 組　　拿真的 net.js 對真的伺服器跑
 node test/check.js          # 靜態 11 組　　標籤閉合、id、版本章、字級與對比度
