@@ -15,6 +15,11 @@
 
 var esc = F.esc, nameOf = F.nameOf, roundLabel = F.roundLabel;
 
+/* 這一頁的狀態是從主辦那臺經過房間伺服器傳過來的，不是這支手機自己算的。
+   所以拼進 HTML 的東西一律過一手：字串（含 id）用 esc()，
+   數字欄位（編號、名次、勝敗和、積分、BO、各局比數）用 Number() 轉過 ——
+   正常的資料轉完一模一樣，被動過手腳的資料頂多變成 NaN，不會變成標籤。 */
+
 /* 名單裡哪一位是我。找不到（還沒選、或主辦換了名單）就是 null */
 function findMe(st, meId) {
   var me = null;
@@ -25,7 +30,7 @@ function findMe(st, meId) {
 /* 還沒選自己是誰的時候，讓選手從名單點自己 */
 function pickListHTML(players) {
   return players.map(function (p) {
-    return '<div class="nm" data-id="' + p.id + '"><i>' + p.no + '</i>' +
+    return '<div class="nm" data-id="' + esc(p.id) + '"><i>' + Number(p.no) + '</i>' +
            '<span>' + esc(p.name) + '</span></div>';
   }).join('') || '<div class="hint">主辦還沒讀入名單。</div>';
 }
@@ -55,9 +60,10 @@ function myTable(st, r, meId) {
   var mbo = mine.bo || 1;
   if (mbo > 1) {
     var mg = E.tallyGames(E.gamesOf(mine));
-    tail += '　<span class="sc">' + (mineIsA ? mg.a + '-' + mg.b : mg.b + '-' + mg.a) +
-            (mg.draw ? '（平 ' + mg.draw + '）' : '') +
-            '　BO' + mbo + '　先贏 ' + E.winsNeeded(mbo) + ' 局</span>';
+    var ga = Number(mg.a), gb = Number(mg.b);
+    tail += '　<span class="sc">' + (mineIsA ? ga + '-' + gb : gb + '-' + ga) +
+            (mg.draw ? '（平 ' + Number(mg.draw) + '）' : '') +
+            '　BO' + Number(mbo) + '　先贏 ' + Number(E.winsNeeded(mbo)) + ' 局</span>';
   }
   return { lead: '你在第', tail: '桌', table: mine.table, small: false,
            opp: '對手　<b>' + esc(nameOf(st, oppId)) + '</b>' + tail };
@@ -101,7 +107,7 @@ function myRoundsHTML(st, mine, meId) {
             : m.result === 'draw' ? '<span class="s">平手</span>'
             : '<span class="s">' + (win ? '勝' : '敗') + '</span>';
     var sc = (!bye && (m.bo || 1) > 1)
-           ? '<span class="s sc">' + (iAmA ? g.a + '-' + g.b : g.b + '-' + g.a) + '</span>' : '';
+           ? '<span class="s sc">' + (iAmA ? Number(g.a) + '-' + Number(g.b) : Number(g.b) + '-' + Number(g.a)) + '</span>' : '';
     return '<div class="wr' + (win ? ' won' : lose ? ' lost' : '') + '">' +
       '<span class="t">' + esc(String(roundLabel(m.round)).replace('第 ', '').replace(' 輪', '')) + '</span>' +
       '<span class="p">' + (bye ? '—' : esc(nameOf(st, oppId))) + '</span>' + sc + tag +
@@ -119,7 +125,7 @@ function roundMatchesHTML(st, ms, meId) {
   var who = function (id, cls) {
     var rec = wrm[id];
     return '<span class="p' + cls + '">' + esc(nameOf(st, id)) +
-           (rec ? '<em class="num">' + rec.rec + '</em>' : '') + '</span>';
+           (rec ? '<em class="num">' + esc(rec.rec) + '</em>' : '') + '</span>';   /* rec 是「2-1」這種字串，所以用 esc */
   };
   return ms.length ? ms.map(function (m) {
     var isMine = (m.a === meId || m.b === meId);
@@ -127,7 +133,7 @@ function roundMatchesHTML(st, ms, meId) {
     var ca = m.result === 'a' ? ' win' : (m.result === 'b' ? ' lose' : '');
     var cb = m.result === 'b' ? ' win' : (m.result === 'a' ? ' lose' : '');
     var mg = E.tallyGames(E.gamesOf(m));
-    var sc = (m.bo || 1) > 1 ? '<span class="x sc">' + mg.a + '-' + mg.b + '</span>' : '<span class="x">VS</span>';
+    var sc = (m.bo || 1) > 1 ? '<span class="x sc">' + Number(mg.a) + '-' + Number(mg.b) + '</span>' : '<span class="x">VS</span>';
     return '<div class="wr' + (isMine ? ' mine' : '') + '">' +
       '<span class="t">' + esc(m.table) + '</span>' + who(m.a, ca) +
       (bye ? '<span class="s">輪空</span>' : sc + who(m.b, cb)) +
@@ -140,10 +146,10 @@ function rankHTML(st, meId) {
   var rk = E.standings(st.players, st.matches, st.config.rules);
   return rk.length ? rk.map(function (x) {
     return '<div class="wr' + (x.id === meId ? ' mine' : '') + '">' +
-      '<span class="n">' + x.rank + '</span>' +
+      '<span class="n">' + Number(x.rank) + '</span>' +
       '<span class="p">' + esc(x.name) + (x.dropped ? '（退賽）' : '') + '</span>' +
-      '<span class="s">' + x.w + '-' + x.l + (x.d ? '-' + x.d : '') + '</span>' +
-      '<span class="s">' + x.pts + ' 分</span>' +
+      '<span class="s">' + Number(x.w) + '-' + Number(x.l) + (x.d ? '-' + Number(x.d) : '') + '</span>' +
+      '<span class="s">' + Number(x.pts) + ' 分</span>' +
       '</div>';
   }).join('') : '<div class="hint">還沒有成績。</div>';
 }

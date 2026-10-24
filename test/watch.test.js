@@ -107,5 +107,21 @@ head('【5】本輪對戰與名次（唯讀）');
   console.log('  本輪對戰、名次 ✓');
 }
 
+head('【6】從別臺傳來的狀態被動過手腳，也拼不出標籤');
+{
+  const bad = '"><img src=x onerror=alert(1)>';
+  const evil = { players: [{ id: bad, no: '<b>1</b>', name: bad }, { id: 'b', no: 2, name: '陳' }],
+                 matches: [{ round: 1, table: bad, a: bad, b: 'b', bo: '3<img>', games: ['a'], result: null }],
+                 config: { rules: { win: '<s>', draw: 1, loss: 0 } } };
+  const all = [W.pickListHTML(evil.players), W.myTable(evil, 1, 'b').opp,
+               W.myRoundsHTML(evil, W.myMatches(evil, 'b'), 'b'),
+               W.roundMatchesHTML(evil, evil.matches, 'b'), W.rankHTML(evil, 'b')].join('');
+  ok(all.indexOf('<img') < 0 && all.indexOf('<b>1</b>') < 0 && all.indexOf('<s>') < 0, '沒有任何一段原封不動進到 HTML');
+  ok(W.pickListHTML(evil.players).indexOf('data-id="&quot;&gt;&lt;img') > 0, 'id 有跳脫');
+  ok(W.pickListHTML(evil.players).indexOf('<i>NaN</i>') > 0, '編號不是數字就變 NaN');
+  /* 正常的資料轉完跟原本一模一樣 —— 上面【1】到【5】的期望值一個都沒改 */
+  console.log('  id、編號、BO、積分規則被塞標籤都擋得住 ✓');
+}
+
 console.log(fails ? '\n有 ' + fails + ' 項沒過 ❌' : '\n全部通過 ✅');
 process.exit(fails ? 1 : 0);
