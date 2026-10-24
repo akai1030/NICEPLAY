@@ -65,11 +65,11 @@ var net = window.Net.create({
 
 /* ── 小工具 ───────────────────────────────────────────
    純函式在 fmt.js；這裡用同名的變數接過來，下面的寫法照舊。 */
-var F = window.Fmt, C = window.Csv;
+var F = window.Fmt, C = window.Csv, V = window.View;
 var esc = F.esc, pad = F.pad, fmtCount = F.fmtCount, nameOf = F.nameOf, numOf = F.numOf,
     recMap = F.recMap, currentRound = F.currentRound, matchesOf = F.matchesOf,
     roundLabel = F.roundLabel, formatLabel = F.formatLabel, fileStem = F.fileStem,
-    eventTitle = F.eventTitle, byTableName = F.byTableName, norm = F.norm,
+    byTableName = F.byTableName, norm = F.norm,
     matchMatches = F.matchMatches;
 
 function toast(msg, bad) {
@@ -172,12 +172,8 @@ function updateTableHint(st) {
   st = st || store.get();
   var n = (drafting || st.players).filter(function (p) { return !p.dropped; }).length;
   if (!n) { el('tableHint').textContent = '先讀入名單，系統會依人數自動建議桌數。'; return; }
-  var count = parseInt(el('fTables').value, 10) || E.suggestTables(n);
-  var names = E.makeTables(Math.min(count, 60), el('fNaming').value,
+  el('tableHint').innerHTML = V.tableHintHTML(n, parseInt(el('fTables').value, 10), el('fNaming').value,
     el('fCustom').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean));
-  var head = names.slice(0, 8).join('、') + (count > 8 ? ' …… ' + names[Math.min(count, 60) - 1] : '');
-  el('tableHint').innerHTML = n + ' 人 → 需要 <b>' + E.suggestTables(n) + '</b> 桌，' +
-    '目前設定 <b>' + count + '</b> 桌：' + esc(head);
 }
 
 /* ── 名單 ─────────────────────────────────────────────
@@ -260,10 +256,7 @@ el('btnParse').onclick = function () {
 };
 
 function paintRoster(list) {
-  el('rosterView').innerHTML = list.map(function (p) {
-    return '<div class="nm' + (p.dropped ? ' out' : '') + '"><i>' + p.no + '</i>' +
-           '<span>' + esc(p.name) + '</span></div>';
-  }).join('');
+  el('rosterView').innerHTML = V.rosterHTML(list);
 }
 
 /* ── 開始比賽 ───────────────────────────────────────── */
@@ -314,26 +307,16 @@ el('btnStartHere').onclick = startEvent;
 
 function paintEvents(st) {
   var lib = S.libLoad();
-  var opts = ['<option value="' + esc(st.id) + '">' +
-              esc(eventTitle({ host: st.event.host, name: st.event.name, date: st.event.date,
-                               players: st.players.length,
-                               rounds: E.countRounds(st.matches) })) +
-              '　←　現在</option>'];
-  lib.forEach(function (e) {
-    opts.push('<option value="' + esc(e.id) + '">' + esc(eventTitle(e)) + '</option>');
-  });
   /* 每次 render 都重建 <select> 會把使用者正在拉開的選單關掉 ——
      內容真的變了才重畫。 */
-  var sig = opts.join('');
+  var sig = V.eventOptionsHTML(st, lib);
   if (el('fEvent')._sig !== sig) {
     el('fEvent')._sig = sig;
     el('fEvent').innerHTML = sig;
   }
   el('fEvent').value = st.id;
   el('btnDelEvent').disabled = !lib.length;   /* 只剩一場就不給刪，免得刪到空 */
-  el('eventHint').innerHTML = lib.length
-    ? '另外還有 <b>' + lib.length + '</b> 場存在這臺電腦裡。切換不會動到任何一場的成績。'
-    : '目前只有這一場。按「新增一場」會把現在這場收起來，開一個全新的。';
+  el('eventHint').innerHTML = V.eventHintHTML(lib.length);
 }
 
 function switchEvent(id) {
@@ -1520,10 +1503,7 @@ function render(st) {
       ? '這 ' + st.players.length + ' 位都在了，確認沒問題就直接開賽 —— 系統會排好第一輪。'
       : '只有 1 位選手，至少要兩位才排得出對戰。';
   /* 名單就列在這裡，不用切回設定頁確認 */
-  el('playEmptyList').innerHTML = st.players.map(function (p) {
-    return '<div class="nm' + (p.dropped ? ' out' : '') + '"><i>' + p.no + '</i>' +
-           '<span>' + esc(p.name) + '</span></div>';
-  }).join('');
+  el('playEmptyList').innerHTML = V.rosterHTML(st.players);
   el('btnStartHere').hidden = !ready;
   /* 還沒排對戰的時候，進度條與那排動作按鈕沒有東西可以操作 ——
      留著只會讓人以為「下一輪」才是開賽的按鈕。 */
