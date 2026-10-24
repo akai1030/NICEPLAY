@@ -16,6 +16,7 @@ const SHELL = [
   './src/watch.js?v=' + VERSION,
   './src/present.js?v=' + VERSION,
   './src/card.js?v=' + VERSION,
+  './src/patch.js?v=' + VERSION,
   './src/ui.js?v=' + VERSION,
   './assets/mark.png', './assets/mark-light.png',
   './assets/wordmark.png', './assets/wordmark-light.png',
