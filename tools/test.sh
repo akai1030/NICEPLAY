@@ -17,7 +17,10 @@ fail=0
 for t in test/engine.test.js test/bo.test.js test/pairing.test.js test/double.test.js test/store.test.js \
          server/test.js test/net.test.js test/check.js; do
   printf '\n════ %s ════\n' "$t"
-  if node "$t" | tail -n 3; then :; else fail=1; fi
+  # 不能寫成 `if node "$t" | tail -n 3`：管線的結束碼是 tail 的，永遠是 0，
+  # 測試掛了也照樣印「全部通過」、CI 也是綠的。先接住輸出與結束碼再印。
+  if out=$(node "$t" 2>&1); then :; else fail=1; fi
+  printf '%s\n' "$out" | tail -n 3
 done
 
 printf '\n'
