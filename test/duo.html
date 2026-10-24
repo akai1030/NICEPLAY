@@ -152,8 +152,9 @@
     say('\n【9】手機離線');
     click(G, D(G).querySelector('.tabs button[data-tab="tSetup"]') || el(G, 'btnLeave'));
     await sleep(150);
+    /* 「離線」現在跳確認框，不是同一顆按兩次（9dc8572） */
     click(G, el(G, 'btnLeave')); await sleep(200);
-    click(G, el(G, 'btnLeave')); await sleep(600);
+    click(G, el(G, 'askYes')); await sleep(600);
     ok(!D(G).body.classList.contains('guest'), '離線後還是加入者模式');
     say('  離線後回到單機模式（要按兩次確認）✓');
 
