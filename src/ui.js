@@ -65,7 +65,7 @@ var net = window.Net.create({
 
 /* ── 小工具 ───────────────────────────────────────────
    純函式在 fmt.js；這裡用同名的變數接過來，下面的寫法照舊。 */
-var F = window.Fmt, C = window.Csv, V = window.View;
+var F = window.Fmt, C = window.Csv, V = window.View, Wt = window.Watch;
 var esc = F.esc, pad = F.pad, fmtCount = F.fmtCount, nameOf = F.nameOf, numOf = F.numOf,
     recMap = F.recMap, currentRound = F.currentRound, matchesOf = F.matchesOf,
     roundLabel = F.roundLabel, formatLabel = F.formatLabel, fileStem = F.fileStem,
@@ -962,127 +962,35 @@ function paintWatch(st) {
   el('wtRound').textContent = r === null ? '尚未開始' : roundLabel(r);
   el('wtCode').textContent = net.code ? '查詢碼 ' + net.code : '';
 
-  var me = null;
-  st.players.forEach(function (p) { if (p.id === meId) me = p; });
+  var me = Wt.findMe(st, meId);
 
   el('wtPick').hidden = !!me;
   el('wtMe').hidden = !me;
 
   if (!me) {
-    el('meList').innerHTML = st.players.map(function (p) {
-      return '<div class="nm" data-id="' + p.id + '"><i>' + p.no + '</i>' +
-             '<span>' + esc(p.name) + '</span></div>';
-    }).join('') || '<div class="hint">主辦還沒讀入名單。</div>';
+    el('meList').innerHTML = Wt.pickListHTML(st.players);
   } else {
     el('wtPlayer').textContent = me.name;
-
-    var mine = null;
-    matchesOf(st, r).forEach(function (m) { if (m.a === meId || m.b === meId) mine = m; });
-
-    if (!mine) {
-      el('wtLead').textContent = ''; el('wtTail').textContent = '';
-      el('wtTable').textContent = r === null ? '尚未開始' : '本輪沒有你的場次';
-      el('wtTable').style.fontSize = '26px';
-      el('wtOpp').textContent = '';
-    } else if (mine.b === null || mine.b === undefined) {
-      el('wtLead').textContent = '本輪'; el('wtTail').textContent = '';
-      el('wtTable').textContent = '輪空';
-      el('wtTable').style.fontSize = '';
-      el('wtOpp').innerHTML = '這一輪不用打，直接算一勝。';
-    } else {
-      el('wtLead').textContent = '你在第'; el('wtTail').textContent = '桌';
-      el('wtTable').textContent = mine.table;
-      el('wtTable').style.fontSize = '';
-      var oppId = (mine.a === meId) ? mine.b : mine.a;
-      var res = mine.result;
-      var mineIsA = (mine.a === meId);
-      var tail = !res ? '' :
-        res === 'draw' ? '　<b>平手</b>' :
-        ((res === 'a') === mineIsA ? '　<b>你贏了</b>' : '　你輸了');
-      /* BO 制要看得到目前幾比幾 —— 選手最想知道的就是「還差幾局」 */
-      var mbo = mine.bo || 1;
-      if (mbo > 1) {
-        var mg = E.tallyGames(E.gamesOf(mine));
-        tail += '　<span class="sc">' + (mineIsA ? mg.a + '-' + mg.b : mg.b + '-' + mg.a) +
-                (mg.draw ? '（平 ' + mg.draw + '）' : '') +
-                '　BO' + mbo + '　先贏 ' + E.winsNeeded(mbo) + ' 局</span>';
-      }
-      el('wtOpp').innerHTML = '對手　<b>' + esc(nameOf(st, oppId)) + '</b>' + tail;
-    }
-
-    var rows = E.standings(st.players, st.matches, st.config.rules);
-    var row = null;
-    rows.forEach(function (x) { if (x.id === meId) row = x; });
-    el('wtStat').textContent = row
-      ? '目前第 ' + row.rank + ' 名　' + row.w + ' 勝 ' + row.l + ' 敗' +
-        (row.d ? ' ' + row.d + ' 平' : '') + '　' + row.pts + ' 分'
-      : '';
+    var t = Wt.myTable(st, r, meId);
+    el('wtLead').textContent = t.lead; el('wtTail').textContent = t.tail;
+    el('wtTable').textContent = t.table;
+    el('wtTable').style.fontSize = t.small ? '26px' : '';
+    el('wtOpp').innerHTML = t.opp;
+    el('wtStat').textContent = Wt.statText(st, meId);
   }
 
-  /* 成績單只在真的有成績之後才出現 —— 還沒打就給一張空的沒有意義 */
-  var played = me && st.matches.some(function (m) {
-    return (m.a === meId || m.b === meId) && m.result;
-  });
+  var played = me && Wt.hasPlayed(st, meId);
   el('wtCardSec').hidden = !played;
   if (played) { try { drawCard(st, me); } catch (e) { el('wtCardSec').hidden = true; } }
 
-  /* 我的每一輪：打過誰、幾比幾。輪空也要列出來，不然選手會以為漏了一輪。 */
-  var mine = me ? st.matches.filter(function (m) { return m.a === meId || m.b === meId; }) : [];
+  var mine = me ? Wt.myMatches(st, meId) : [];
   el('wtMineSec').hidden = !mine.length;
-  if (mine.length) {
-    el('wtMine').innerHTML = mine.map(function (m) {
-      var bye = (m.b === null || m.b === undefined);
-      var iAmA = (m.a === meId);
-      var g = E.tallyGames(E.gamesOf(m));
-      var oppId = iAmA ? m.b : m.a;
-      var win = !bye && m.result && m.result !== 'draw' && ((m.result === 'a') === iAmA);
-      var lose = !bye && m.result && m.result !== 'draw' && !win;
-      var tag = bye ? '<span class="s">輪空 · 視同勝</span>'
-              : !m.result ? '<span class="s">進行中</span>'
-              : m.result === 'draw' ? '<span class="s">平手</span>'
-              : '<span class="s">' + (win ? '勝' : '敗') + '</span>';
-      var sc = (!bye && (m.bo || 1) > 1)
-             ? '<span class="s sc">' + (iAmA ? g.a + '-' + g.b : g.b + '-' + g.a) + '</span>' : '';
-      return '<div class="wr' + (win ? ' won' : lose ? ' lost' : '') + '">' +
-        '<span class="t">' + esc(String(roundLabel(m.round)).replace('第 ', '').replace(' 輪', '')) + '</span>' +
-        '<span class="p">' + (bye ? '—' : esc(nameOf(st, oppId))) + '</span>' + sc + tag +
-        '</div>';
-    }).join('');
-  }
+  if (mine.length) el('wtMine').innerHTML = Wt.myRoundsHTML(st, mine, meId);
 
-  /* 本輪對戰（唯讀） */
   var ms = (r === null) ? [] : matchesOf(st, r);
-  el('wtMatchTitle').textContent = r === null ? '本輪對戰' : roundLabel(r) + '　對戰';
-  var wrm = recMap(st);
-  /* 這裡不要再用 r 當變數名 —— 外面的 r 是「第幾輪」 */
-  var who = function (id, cls) {
-    var rec = wrm[id];
-    return '<span class="p' + cls + '">' + esc(nameOf(st, id)) +
-           (rec ? '<em class="num">' + rec.rec + '</em>' : '') + '</span>';
-  };
-  el('wtMatches').innerHTML = ms.length ? ms.map(function (m) {
-    var isMine = (m.a === meId || m.b === meId);
-    var bye = (m.b === null || m.b === undefined);
-    var ca = m.result === 'a' ? ' win' : (m.result === 'b' ? ' lose' : '');
-    var cb = m.result === 'b' ? ' win' : (m.result === 'a' ? ' lose' : '');
-    var mg = E.tallyGames(E.gamesOf(m));
-    var sc = (m.bo || 1) > 1 ? '<span class="x sc">' + mg.a + '-' + mg.b + '</span>' : '<span class="x">VS</span>';
-    return '<div class="wr' + (isMine ? ' mine' : '') + '">' +
-      '<span class="t">' + esc(m.table) + '</span>' + who(m.a, ca) +
-      (bye ? '<span class="s">輪空</span>' : sc + who(m.b, cb)) +
-      '</div>';
-  }).join('') : '<div class="hint">還沒排對戰。</div>';
-
-  /* 名次（唯讀） */
-  var rk = E.standings(st.players, st.matches, st.config.rules);
-  el('wtRank').innerHTML = rk.length ? rk.map(function (x) {
-    return '<div class="wr' + (x.id === meId ? ' mine' : '') + '">' +
-      '<span class="n">' + x.rank + '</span>' +
-      '<span class="p">' + esc(x.name) + (x.dropped ? '（退賽）' : '') + '</span>' +
-      '<span class="s">' + x.w + '-' + x.l + (x.d ? '-' + x.d : '') + '</span>' +
-      '<span class="s">' + x.pts + ' 分</span>' +
-      '</div>';
-  }).join('') : '<div class="hint">還沒有成績。</div>';
+  el('wtMatchTitle').textContent = Wt.matchTitle(r);
+  el('wtMatches').innerHTML = Wt.roundMatchesHTML(st, ms, meId);
+  el('wtRank').innerHTML = Wt.rankHTML(st, meId);
 }
 
 /* ── 賽後成績單 ───────────────────────────────────────
