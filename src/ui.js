@@ -771,21 +771,10 @@ el('btnCsvLog').onclick = function () {
 el('btnTents').onclick = function () {
   var st = store.get(), r = currentRound(st);
   if (r === null) { toast('還沒排對戰，沒有桌卡可以印', true); return; }
-  var ms = matchesOf(st, r).filter(function (m) { return m.b !== null && m.b !== undefined; })
-                           .sort(byTableName);
+  var ms = V.tentMatches(st, r);
   if (!ms.length) { toast('這一輪沒有要坐桌的場次', true); return; }
 
-  var head = [st.event.host, st.event.name].filter(Boolean).join('　·　');
-  el('tents').innerHTML = ms.map(function (m) {
-    var bo = m.bo || 1;
-    return '<div class="tent">' +
-      '<div class="tent-hd">' + esc(head) + '<b>' + esc(roundLabel(m.round)) + '</b></div>' +
-      '<div class="tent-no">' + esc(m.table) + '</div>' +
-      '<div class="tent-p"><i>' + numOf(st, m.a) + '</i>' + esc(nameOf(st, m.a)) + '</div>' +
-      '<div class="tent-vs">VS' + (bo > 1 ? '　·　BO' + bo + '　先贏 ' + E.winsNeeded(bo) + ' 局' : '') + '</div>' +
-      '<div class="tent-p"><i>' + numOf(st, m.b) + '</i>' + esc(nameOf(st, m.b)) + '</div>' +
-      '</div>';
-  }).join('');
+  el('tents').innerHTML = V.tentsHTML(st, ms);
 
   document.body.classList.add('print-tents');
   setTimeout(function () {

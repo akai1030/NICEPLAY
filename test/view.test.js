@@ -139,5 +139,27 @@ head('【5】名次表');
   console.log('  空名單、晉級線、前四名、搜尋、退賽、輪空、分組 ✓');
 }
 
+head('【6】桌卡');
+{
+  const st = { event: { host: '桌遊記', name: '' },
+               players: [{ id: 'a', no: 1, name: '王<小明>' }, { id: 'b', no: 2, name: '陳' },
+                         { id: 'c', no: 3, name: '林' }, { id: 'd', no: 4, name: '李' }, { id: 'e', no: 5, name: '吳' }],
+               matches: [{ round: 1, table: '1', a: 'e', b: 'd', result: 'a' },
+                         { round: 2, table: '10', a: 'a', b: 'b', bo: 3 },
+                         { round: 2, table: '輪空', a: 'e', b: null, result: 'bye' },
+                         { round: 2, table: '2', a: 'c', b: 'd' }] };
+  const ms = V.tentMatches(st, 2);
+  eq(ms.map(m => m.table).join(), '2,10', '只印那一輪、輪空不印、照桌號排');
+  const h = V.tentsHTML(st, ms);
+  eq((h.match(/<div class="tent">/g) || []).length, 2, '一場一張');
+  ok(h.indexOf('<div class="tent-hd">桌遊記<b>第 2 輪</b></div>') > 0, '沒有賽事名稱就只放主辦');
+  ok(h.indexOf('<i>1</i>王&lt;小明&gt;') > 0, '名字有跳脫');
+  ok(h.indexOf('<div class="tent-vs">VS　·　BO3　先贏 2 局</div>') > 0, 'BO3 寫先贏幾局');
+  ok(h.indexOf('<div class="tent-vs">VS</div>') > 0, 'BO1 只寫 VS');
+  ok(V.tentsHTML({ event: { host: 'A', name: 'B' }, players: [], matches: [] },
+                 [{ round: 'W1', table: '3', a: 'x', b: 'y' }]).indexOf('A　·　B<b>勝部第 1 輪</b>') > 0, '主辦與名稱都有、雙敗輪次');
+  console.log('  場次篩選、排序、表頭、BO 說明 ✓');
+}
+
 console.log(fails ? '\n有 ' + fails + ' 項沒過 ❌' : '\n全部通過 ✅');
 process.exit(fails ? 1 : 0);

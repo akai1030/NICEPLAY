@@ -210,11 +210,34 @@ function rankTableHTML(st, players, matches, q, raw) {
   return h + '</tbody></table>';
 }
 
+/* ── 桌卡 ─────────────────────────────────────────── */
+
+/* 要印桌卡的場次：輪空的人沒有桌子要坐，所以不印；照桌號排，印出來才好發。 */
+function tentMatches(st, r) {
+  return F.matchesOf(st, r).filter(function (m) { return m.b !== null && m.b !== undefined; })
+                           .sort(byTableName);
+}
+
+function tentsHTML(st, ms) {
+  var head = [st.event.host, st.event.name].filter(Boolean).join('　·　');
+  return ms.map(function (m) {
+    var bo = m.bo || 1;
+    return '<div class="tent">' +
+      '<div class="tent-hd">' + esc(head) + '<b>' + esc(F.roundLabel(m.round)) + '</b></div>' +
+      '<div class="tent-no">' + esc(m.table) + '</div>' +
+      '<div class="tent-p"><i>' + numOf(st, m.a) + '</i>' + esc(nameOf(st, m.a)) + '</div>' +
+      '<div class="tent-vs">VS' + (bo > 1 ? '　·　BO' + bo + '　先贏 ' + E.winsNeeded(bo) + ' 局' : '') + '</div>' +
+      '<div class="tent-p"><i>' + numOf(st, m.b) + '</i>' + esc(nameOf(st, m.b)) + '</div>' +
+      '</div>';
+  }).join('');
+}
+
 return {
   rosterHTML: rosterHTML, tableHintHTML: tableHintHTML,
   eventOptionsHTML: eventOptionsHTML, eventHintHTML: eventHintHTML,
   visibleMatches: visibleMatches, findMsg: findMsg,
   matchCardHTML: matchCardHTML, matchListHTML: matchListHTML, side: side, pipsOf: pipsOf,
-  rankTitle: rankTitle, rankView: rankView, rankTableHTML: rankTableHTML
+  rankTitle: rankTitle, rankView: rankView, rankTableHTML: rankTableHTML,
+  tentMatches: tentMatches, tentsHTML: tentsHTML
 };
 });
