@@ -11,6 +11,7 @@ const SHELL = [
   './src/engine.js?v=' + VERSION,
   './src/store.js?v=' + VERSION, './src/net.js?v=' + VERSION,
   './src/fmt.js?v=' + VERSION,
+  './src/csv.js?v=' + VERSION,
   './src/ui.js?v=' + VERSION,
   './assets/mark.png', './assets/mark-light.png',
   './assets/wordmark.png', './assets/wordmark-light.png',

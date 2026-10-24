@@ -8,6 +8,7 @@
 #   double  雙敗淘汰：勝敗部的相依順序、加賽時機、輪空補齊
 #   store   名單解析、匯出匯入、還原點、舊存檔相容
 #   fmt     介面共用的小工具：跳脫、輪次名稱、賽制說明、桌號排序、搜尋
+#   csv     匯出 CSV：欄位、公式注入、BOM 與 CRLF
 #   server  房間伺服器的 HTTP 行為與權限
 #   net     連線層，拿真的 net.js 對真的伺服器跑
 #   check   結構性問題：標籤沒閉合、id 重複、版本章沒對齊、字級破規範
@@ -17,7 +18,7 @@ cd "$(dirname "$0")/.."
 fail=0
 n=0
 for t in test/engine.test.js test/bo.test.js test/pairing.test.js test/double.test.js test/store.test.js \
-         test/fmt.test.js \
+         test/fmt.test.js test/csv.test.js \
          server/test.js test/net.test.js test/check.js; do
   printf '\n════ %s ════\n' "$t"
   n=$((n + 1))
