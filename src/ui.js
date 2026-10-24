@@ -228,6 +228,9 @@ function syncFormatFields() {
 
 /* 幾勝制講清楚兩件現場一定會問的事：要贏幾局、平手怎麼算 */
 function boHintText(hasNormal, hasKO) {
+  /* 雙敗那一句要看賽制。這個 f 原本沒有宣告（是 syncFormatFields 裡的區域變數），
+     嚴格模式下直接丟 ReferenceError —— 開機那一次 render 跑不到，整個介面停在空殼。 */
+  var f = el('fFormat').value;
   var parts = [];
   if (hasNormal) parts.push('常規賽 ' + boWord(parseInt(el('fBo').value, 10) || 1));
   if (hasKO) parts.push('淘汰賽 ' + boWord(parseInt(el('fBoKO').value, 10) || 1));
