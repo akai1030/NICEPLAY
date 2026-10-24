@@ -63,85 +63,21 @@ var net = window.Net.create({
   onStatus: function (s) { paintNet(s); }
 });
 
-/* ── 小工具 ─────────────────────────────────────────── */
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-  });
-}
-function pad(n) { return (n < 10 ? '0' : '') + n; }
-function fmtCount(ms) {
-  var neg = ms < 0; if (neg) ms = -ms;
-  var s = Math.floor(ms / 1000);
-  var t = s >= 3600
-    ? Math.floor(s / 3600) + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60)
-    : pad(Math.floor(s / 60)) + ':' + pad(s % 60);
-  return (neg ? '+' : '') + t;
-}
+/* ── 小工具 ───────────────────────────────────────────
+   純函式在 fmt.js；這裡用同名的變數接過來，下面的寫法照舊。 */
+var F = window.Fmt;
+var esc = F.esc, pad = F.pad, fmtCount = F.fmtCount, nameOf = F.nameOf, numOf = F.numOf,
+    recMap = F.recMap, currentRound = F.currentRound, matchesOf = F.matchesOf,
+    roundLabel = F.roundLabel, formatLabel = F.formatLabel, fileStem = F.fileStem,
+    eventTitle = F.eventTitle, byTableName = F.byTableName, norm = F.norm,
+    matchMatches = F.matchMatches;
+
 function toast(msg, bad) {
   var t = el('toast');
   t.textContent = msg;
   t.className = 'on' + (bad ? ' bad' : '');
   clearTimeout(toast._t);
   toast._t = setTimeout(function () { t.className = ''; }, bad ? 5200 : 3200);
-}
-function nameOf(st, id) {
-  if (id === null || id === undefined) return '輪空';
-  for (var i = 0; i < st.players.length; i++) if (st.players[i].id === id) return st.players[i].name;
-  return '？';
-}
-function numOf(st, id) {
-  for (var i = 0; i < st.players.length; i++) if (st.players[i].id === id) return st.players[i].no;
-  return '';
-}
-function alive(st) { return st.players.filter(function (p) { return !p.dropped; }); }
-
-/* 每個人的戰績查表。名字後面隨時看得到幾勝幾敗 ——
-   現場最常被問的就是這個，而且會被問到主辦沒空排下一輪。
-   算一次給整個畫面共用，不要每張卡各算一次。 */
-function recMap(st) {
-  var out = {};
-  try {
-    E.standings(st.players, st.matches, st.config.rules).forEach(function (x) {
-      out[x.id] = { rec: x.w + '-' + x.l + (x.d ? '-' + x.d : ''), pts: x.pts, rank: x.rank };
-    });
-  } catch (e) {}
-  return out;
-}
-
-/* 目前這一輪的 key（數字或「八強」這種字串） */
-function currentRound(st) {
-  if (!st.matches.length) return null;
-  return st.matches[st.matches.length - 1].round;
-}
-function matchesOf(st, round) {
-  return st.matches.filter(function (m) { return m.round === round; });
-}
-/* 輪次名稱。雙敗的 W1 / L4 / F 對現場沒有意義，一律翻成人話。 */
-function roundLabel(r) {
-  if (typeof r === 'number') return '第 ' + r + ' 輪';
-  return /^[WL]\d+$|^F2?$/.test(r) ? E.koName(r) : r;
-}
-
-/* 賽制寫成人話。紙本與檔名都用得到 —— 印出來貼在櫃檯的那張，
-   要讓沒參加的人也看得懂這是什麼比賽。 */
-function formatLabel(cfg) {
-  var f = cfg.format;
-  var base = f === 'roundrobin' ? '循環賽'
-           : f === 'single' ? '單敗淘汰'
-           : f === 'double' ? '雙敗淘汰'
-           : '瑞士制 ' + cfg.rounds + ' 輪';
-  if (f === 'swiss' && cfg.cut >= 2) base += '＋前 ' + cfg.cut + ' 名淘汰賽';
-  var bo = cfg.bo || 1, bk = cfg.boKO || 1;
-  if (f === 'single' || f === 'double') return base + '　BO' + bk;
-  if (bo === bk || !cfg.cut) return base + '　BO' + bo;
-  return base + '　常規 BO' + bo + '／淘汰 BO' + bk;
-}
-
-/* 檔名前綴：主辦_賽事_日期。存成一整個資料夾之後才分得出哪張是哪場。 */
-function fileStem(st) {
-  return [st.event.host, st.event.name || 'niceplay', st.event.date]
-    .filter(Boolean).join('_').replace(/[\\/:*?"<>|\s]+/g, '_');
 }
 
 /* ── 分頁 ───────────────────────────────────────────── */
@@ -228,26 +164,8 @@ function syncFormatFields() {
 
 /* 幾勝制講清楚兩件現場一定會問的事：要贏幾局、平手怎麼算 */
 function boHintText(hasNormal, hasKO) {
-  /* 雙敗那一句要看賽制。這個 f 原本沒有宣告（是 syncFormatFields 裡的區域變數），
-     嚴格模式下直接丟 ReferenceError —— 開機那一次 render 跑不到，整個介面停在空殼。 */
-  var f = el('fFormat').value;
-  var parts = [];
-  if (hasNormal) parts.push('常規賽 ' + boWord(parseInt(el('fBo').value, 10) || 1));
-  if (hasKO) parts.push('淘汰賽 ' + boWord(parseInt(el('fBoKO').value, 10) || 1));
-  if (f === 'double') {
-    parts.push('雙敗：輸一場掉敗部，敗部再輸才結束。' +
-               '總決賽如果是敗部冠軍贏，兩邊都只輸一場，會自動加賽一場');
-  }
-  if (!parts.length) return '';
-  return parts.join('　·　') + '<br>' +
-    '對戰卡上點誰贏，就記他一局；打滿還沒有人過半就算平手（BO2 的 1-1、BO3 的 1-1-1）。' +
-    '點錯用卡片右邊的「退一局」往回退。<b>每一場的幾勝制在排出來的當下就定了</b> —— ' +
-    '中途改設定只影響之後排的輪次，已經打完的不會被改寫。';
-}
-function boWord(bo) {
-  if (bo <= 1) return '<b>BO1</b>　一局定勝負';
-  return '<b>BO' + bo + '</b>　先贏 ' + E.winsNeeded(bo) + ' 局' +
-         (bo % 2 === 0 ? '，' + (bo / 2) + '-' + (bo / 2) + ' 算平手' : '');
+  return F.boHint(hasNormal, hasKO, parseInt(el('fBo').value, 10) || 1,
+                  parseInt(el('fBoKO').value, 10) || 1, el('fFormat').value);
 }
 
 function updateTableHint(st) {
@@ -393,12 +311,6 @@ el('btnStartHere').onclick = startEvent;
    開著房的時候切換，房間會跟著換成新的那一場 —— 房號不變，
    所以副控與選手的畫面會整個換掉。那通常正是想要的（同一臺筆電
    接著辦下一場），但要先講一聲。 */
-function eventTitle(e) {
-  var bits = [e.host, e.name || '（未命名）', e.date].filter(Boolean).join('　');
-  var tail = e.players ? '　' + e.players + ' 人' : '';
-  if (e.rounds) tail += ' · ' + e.rounds + ' 輪';
-  return bits + tail;
-}
 
 function paintEvents(st) {
   var lib = S.libLoad();
@@ -1680,23 +1592,6 @@ var SORT_KEY = 'niceplay.sort';
 function sortMode() {
   return localStorage.getItem(SORT_KEY) === 'table' ? 'table' : 'rank';
 }
-/* 桌號可能是 1、2、10，也可能是 A、B，或自訂的 Q1。
-   純數字要照數值比（不然 10 會排在 2 前面），其餘照字面。 */
-function byTableName(x, y) {
-  var a = String(x.table), b = String(y.table);
-  var na = /^\d+$/.test(a), nb = /^\d+$/.test(b);
-  if (na && nb) return parseInt(a, 10) - parseInt(b, 10);
-  if (na !== nb) return na ? -1 : 1;
-  return a.localeCompare(b, 'zh-Hant');
-}
-function norm(s) { return String(s || '').trim().toLowerCase(); }
-function matchMatches(st, m, q) {
-  if (norm(m.table).indexOf(q) >= 0) return true;
-  return [m.a, m.b].some(function (id) {
-    if (id === null || id === undefined) return false;
-    return norm(nameOf(st, id)).indexOf(q) >= 0 || String(numOf(st, id)) === q;
-  });
-}
 
 /* 對戰列表 */
 function paintMatches(st) {
@@ -2129,11 +2024,7 @@ store.subscribe(function (st, remote) {
    版本章本來就蓋在每個 script 的網址上，直接讀回來就好，不必另外維護一份。 */
 function appVersion() {
   var s = document.querySelector('script[src*="ui.js"]');
-  var m = s && s.src.match(/[?&]v=(\d+)/);
-  if (!m) return '開發版';
-  var v = m[1];
-  return v.slice(0, 4) + '-' + v.slice(4, 6) + '-' + v.slice(6, 8) + ' ' +
-         v.slice(8, 10) + ':' + v.slice(10, 12);
+  return F.versionLabel(s && s.src);
 }
 el('appVer').textContent = appVersion();
 el('bookVer').textContent = appVersion();
