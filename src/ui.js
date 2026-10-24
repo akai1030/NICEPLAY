@@ -67,6 +67,9 @@ var net = window.Net.create({
    純函式在 fmt.js；這裡用同名的變數接過來，下面的寫法照舊。 */
 var F = window.Fmt, C = window.Csv, V = window.View, Wt = window.Watch, Pv = window.Present,
     Card = window.Card;
+/* 有輸入框牽動的那幾塊（對戰列表、名次表、桌數提示）用 patch 取代 innerHTML：
+   畫出來一樣，但沒變的按鈕留著，鍵盤焦點不會每回報一下就掉回 <body>。見 patch.js */
+var patch = window.Patch.patch;
 var esc = F.esc, pad = F.pad, fmtCount = F.fmtCount, nameOf = F.nameOf, numOf = F.numOf,
     recMap = F.recMap, currentRound = F.currentRound, matchesOf = F.matchesOf,
     roundLabel = F.roundLabel, formatLabel = F.formatLabel, fileStem = F.fileStem,
@@ -173,8 +176,8 @@ function updateTableHint(st) {
   st = st || store.get();
   var n = (drafting || st.players).filter(function (p) { return !p.dropped; }).length;
   if (!n) { el('tableHint').textContent = '先讀入名單，系統會依人數自動建議桌數。'; return; }
-  el('tableHint').innerHTML = V.tableHintHTML(n, parseInt(el('fTables').value, 10), el('fNaming').value,
-    el('fCustom').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean));
+  patch(el('tableHint'), V.tableHintHTML(n, parseInt(el('fTables').value, 10), el('fNaming').value,
+    el('fCustom').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean)));
 }
 
 /* ── 名單 ─────────────────────────────────────────────
@@ -1337,7 +1340,7 @@ function sortMode() {
 function paintMatches(st) {
   var r = currentRound(st);
   if (r === null) {
-    el('matchList').innerHTML = '<div class="hint">還沒開始。到「設定」讀入名單後按「開始比賽」。</div>';
+    patch(el('matchList'), '<div class="hint">還沒開始。到「設定」讀入名單後按「開始比賽」。</div>');
     el('progDone').textContent = '0/0';
     el('progRound').textContent = '—';
     el('progBar').style.width = '0';
@@ -1363,13 +1366,13 @@ function paintMatches(st) {
   var view = V.visibleMatches(st, ms, sortMode() === 'table', q);
   el('playFindMsg').textContent = V.findMsg(q, el('playFind').value, view.length, ms.length);
 
-  el('matchList').innerHTML = V.matchListHTML(st, view, recMap(st), net.role === 'watch' ? meId : '');
+  patch(el('matchList'), V.matchListHTML(st, view, recMap(st), net.role === 'watch' ? meId : ''));
 }
 
 /* 排名表：要畫什麼在 view.js 的 rankView，這裡只讀搜尋框、放上畫面 */
 function paintRank(st) {
   var v = V.rankView(st, norm(el('rankFind').value), el('rankFind').value);
-  el('rankView').innerHTML = v.html;
+  patch(el('rankView'), v.html);
   if (v.title !== null) el('rankTitle').textContent = v.title;
 }
 
