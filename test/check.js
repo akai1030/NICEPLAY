@@ -23,7 +23,11 @@ const head = t => console.log('\n' + t);
 
 const html = read('index.html');
 const css = read('src/style.css');
-const ui = read('src/ui.js');
+/* 介面的程式不只 ui.js：畫面的 HTML 片段、小工具拆在別的檔裡。
+   以 index.html 實際載入的 script 為準，全部接起來一起查 ——
+   只看 ui.js 的話，搬出去的那些就沒人檢查了。 */
+const scripts = [...html.matchAll(/<script src="(src\/[^"?]+)/g)].map(m => m[1]);
+const ui = scripts.map(read).join('\n');
 const sw = read('sw.js');
 const lines = html.split(/\r?\n/);
 
@@ -56,7 +60,7 @@ head('【2】id 不重複');
 }
 
 /* ── 3 ─────────────────────────────────────────────── */
-head('【3】ui.js 取用的元素都真的在 index.html 裡');
+head('【3】介面程式（index.html 載入的每一支 script）取用的元素都真的在 index.html 裡');
 {
   const ids = new Set([...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]));
   const used = new Set([...ui.matchAll(/\bel\('([^']+)'\)/g)].map(m => m[1]));
@@ -121,7 +125,12 @@ head('【6】Service Worker 快取清單裡的檔案都存在');
     if (!exists(clean)) bad.push(clean);
   });
   ok(!bad.length, '快取清單列了不存在的檔案，離線會缺一塊：' + bad.join('、'));
-  console.log('  ' + shell.length + ' 個項目，檔案都在 ✓');
+
+  /* 反過來也要查：index.html 載入的 script 不在清單裡，離線時那支就是 404 */
+  const cached = new Set(shell.map(p => p.split('?')[0]));
+  const uncached = scripts.filter(p => !cached.has(p));
+  ok(!uncached.length, 'index.html 載入了、但快取清單沒有：' + uncached.join('、'));
+  console.log('  ' + shell.length + ' 個項目，檔案都在；' + scripts.length + ' 支 script 都有快取 ✓');
 }
 
 /* ── 7 ─────────────────────────────────────────────── */
