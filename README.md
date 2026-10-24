@@ -136,7 +136,14 @@ src/engine.js         賽制引擎（純函式，不碰畫面、儲存、網路�
 src/qr.js             QR 產生器（零相依，不連外部服務）
 src/store.js          狀態：localStorage + BroadcastChannel
 src/net.js            連線層：開房／加入／SSE／輪詢
-src/ui.js             介面
+src/fmt.js            介面共用的小工具：跳脫、輪次名稱、賽制說明、桌號排序、搜尋
+src/csv.js            匯出 CSV（名次表、對戰紀錄）
+src/view.js           控制台三頁的畫面片段（名單、對戰卡、名次表、桌卡……）
+src/watch.js          選手查詢畫面的內容
+src/present.js        投影畫面的內容與欄數
+src/card.js           賽後成績單（Canvas）
+src/patch.js          局部更新：取代 innerHTML，沒變的節點留著
+src/ui.js             介面：讀輸入框、接事件、把上面幾支吐出來的東西放上畫面
 src/style.css         視覺（語意 token，深淺兩主題）
 assets/               品牌素材，深淺各一版
 sw.js                 Service Worker
@@ -170,13 +177,20 @@ E.playGame(match, 'a');                 // { games, result } | null（這一下�
 ## 測試
 
 ```bash
-sh tools/test.sh            # 一次跑完下面八組（push 時 GitHub Actions 也會跑）
+sh tools/test.sh            # 一次跑完下面十五組（push 時 GitHub Actions 也會跑）
 
 node test/engine.test.js    # 引擎 11 組　　賽制算得對不對
 node test/bo.test.js        # 幾勝制 12 組　含「小局不影響名次」那條界線
 node test/pairing.test.js   # 配對 12 組　　遲到補分、避開同隊、分組與交叉種子
 node test/double.test.js    # 雙敗 10 組　　勝敗部相依順序、加賽時機、輪空補齊
 node test/store.test.js     # 狀態 13 組　　名單解析、匯出匯入、還原點、賽事清單
+node test/fmt.test.js       # 小工具 9 組　　跳脫、倒數、輪次名稱、賽制說明、桌號排序與搜尋
+node test/csv.test.js       # CSV 4 組　　　公式注入、BOM 與 CRLF、名次表、對戰紀錄
+node test/view.test.js      # 畫面片段 6 組　名單、桌數提示、賽事清單、對戰卡、名次表、桌卡
+node test/watch.test.js     # 選手畫面 6 組　我在第幾桌、比分方向、我的每一輪、塞標籤擋得住
+node test/present.test.js   # 投影 5 組　　　回報進度、預計結束時間、欄數、對戰表、名次
+node test/card.test.js      # 成績單 3 組　　每一輪那幾行、名次與戰績畫在哪（假的 2D context）
+node test/patch.test.js     # 局部更新 5 組　結果跟 innerHTML 一樣、沒變的節點留著
 node server/test.js         # 伺服器 10 組　HTTP 行為與權限
 node test/net.test.js       # 連線層 8 組　　拿真的 net.js 對真的伺服器跑
 node test/check.js          # 靜態 11 組　　標籤閉合、id、版本章、字級與對比度
@@ -185,6 +199,7 @@ python3 -m http.server 8123
 #  /test/e2e.html                                單機端對端
 #  /test/duo.html?srv=http://127.0.0.1:8799      雙裝置端對端
 #  /test/watch.html?srv=http://127.0.0.1:8799    副控／選手分流
+#  /test/patch.html                              局部更新跟 innerHTML 逐步對照、焦點留著
 #  /test/shot.html?theme=light&view=book         視覺檢查（截圖用）
 ```
 

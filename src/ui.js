@@ -64,17 +64,18 @@ var net = window.Net.create({
 });
 
 /* ── 小工具 ───────────────────────────────────────────
-   純函式在 fmt.js；這裡用同名的變數接過來，下面的寫法照舊。 */
+   純函式在 fmt.js（小工具）、csv.js、view.js（控制台）、watch.js（選手）、
+   present.js（投影）、card.js（成績單）；這裡用短名接過來，
+   常用的小工具再用原本的名字接一次，下面的寫法照舊。 */
 var F = window.Fmt, C = window.Csv, V = window.View, Wt = window.Watch, Pv = window.Present,
     Card = window.Card;
 /* 有輸入框牽動的那幾塊（對戰列表、名次表、桌數提示）用 patch 取代 innerHTML：
    畫出來一樣，但沒變的按鈕留著，鍵盤焦點不會每回報一下就掉回 <body>。見 patch.js */
 var patch = window.Patch.patch;
-var esc = F.esc, pad = F.pad, fmtCount = F.fmtCount, nameOf = F.nameOf, numOf = F.numOf,
+var esc = F.esc, pad = F.pad, fmtCount = F.fmtCount, nameOf = F.nameOf,
     recMap = F.recMap, currentRound = F.currentRound, matchesOf = F.matchesOf,
     roundLabel = F.roundLabel, formatLabel = F.formatLabel, fileStem = F.fileStem,
-    byTableName = F.byTableName, norm = F.norm,
-    matchMatches = F.matchMatches;
+    norm = F.norm;
 
 function toast(msg, bad) {
   var t = el('toast');
