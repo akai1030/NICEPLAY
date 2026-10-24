@@ -1593,9 +1593,11 @@ document.addEventListener('keydown', function (e) {
 });
 
 /* 搜尋與排序：只改看到的東西，不動狀態，所以直接重畫就好。
-   搜尋用 input 即時反應 —— 現場是「有人站在旁邊等」的情境。 */
-el('playFind').oninput = function () { render(store.get()); };
-el('rankFind').oninput = function () { render(store.get()); };
+   搜尋用 input 即時反應 —— 現場是「有人站在旁邊等」的情境。
+   搜尋框只牽動自己那一份列表，所以每打一個字只重畫那一份，
+   不必整頁 render（QR、名單框、賽事清單都跟搜尋無關）。 */
+el('playFind').oninput = function () { paintMatches(store.get()); };
+el('rankFind').oninput = function () { paintRank(store.get()); };
 el('fSort').onchange = function () {
   try { localStorage.setItem(SORT_KEY, el('fSort').value); } catch (e) {}
   render(store.get());
