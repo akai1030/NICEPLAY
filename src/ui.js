@@ -1570,75 +1570,11 @@ function paintMatches(st) {
   el('matchList').innerHTML = V.matchListHTML(st, view, recMap(st), net.role === 'watch' ? meId : '');
 }
 
-/* 排名表 */
+/* 排名表：要畫什麼在 view.js 的 rankView，這裡只讀搜尋框、放上畫面 */
 function paintRank(st) {
-  if (!st.players.length) { el('rankView').innerHTML =
-    '<div class="hint">還沒有名單。</div>'; return; }
-
-  /* 分組賽的名次一定要分組看。把各組混在一起排，數字就沒有意義了 ——
-     A 組第 1 跟 B 組第 1 打的是完全不同的一批人，積分不可比。 */
-  var gids = E.groupIds(st.config);
-  if (gids.length >= 2 && st.players.some(function (p) { return p.group; })) {
-    el('rankView').innerHTML = gids.map(function (g) {
-      var gp = E.inGroup(st.players, g);
-      if (!gp.length) return '';
-      var gm = E.groupMatches(st.matches, gp.map(function (p) { return p.id; }));
-      return '<h3 class="grp">' + g + ' 組　<span>' + gp.length + ' 人</span></h3>' +
-             rankTable(st, gp, gm);
-    }).join('');
-    var per = Math.max(1, Math.floor((st.config.cut || 0) / gids.length));
-    el('rankTitle').textContent = st.config.cut
-      ? '分組名次 · 各組前 ' + per + ' 名晉級' : '分組名次';
-    return;
-  }
-  el('rankView').innerHTML = rankTable(st, st.players, st.matches);
-}
-
-function rankTable(st, players, matches) {
-  var rows = E.standings(players, matches, st.config.rules);
-  var live = rows.filter(function (r) { return !r.dropped; });
-  var cut = st.config.cut || 0;
-  el('rankTitle').textContent = cut ? '即時名次 · 前 ' + cut + ' 名晉級' : '即時名次';
-
-  /* 搜尋只藏列，名次照原本算 —— 篩出來的那個人旁邊還是他真正的名次，
-     不會因為只剩他一列就變成第 1 名。 */
-  var q = norm(el('rankFind').value);
-  var shown = q ? rows.filter(function (r) {
-    return norm(r.name).indexOf(q) >= 0 || String(r.no) === q;
-  }) : rows;
-  if (q && !shown.length) {
-    return '<div class="hint">找不到「' + esc(el('rankFind').value.trim()) +
-           '」。這一份名單上共 ' + rows.length + ' 人。</div>';
-  }
-
-  var h = '<table class="rank"><thead><tr><th>#</th><th class="l">選手</th>' +
-          '<th>戰績</th><th>積分</th><th>OMW%</th><th>OOMW%</th><th></th></tr></thead><tbody>';
-  /* 前四名另外標 —— 那是有獎的名次，跟「晉級線」是兩件事，
-     所以就算沒有設定晉級人數也要看得出來。 */
-  var played = rows.some(function (r) { return r.played > 0; });
-  shown.forEach(function (r) {
-    var idx = live.indexOf(r);
-    var inCut = cut && !r.dropped && idx > -1 && idx < cut;
-    var podium = played && !r.dropped && idx > -1 && idx < 4;
-    h += '<tr class="' + (inCut ? 'cut ' : '') + (cut && idx === cut - 1 ? 'cutline ' : '') +
-         (podium ? 'top4 ' : '') + (r.dropped ? 'out' : '') + '">' +
-         '<td class="rk">' + r.rank + '</td>' +
-         '<td class="l"><div class="nmcell"><i>' + r.no + '</i>' + esc(r.name) +
-           (r.byes ? ' <span style="color:var(--dim);font-size:12px">輪空' + r.byes + '</span>' : '') +
-         '</div>' +
-         /* 手機上右邊兩欄放不下，同一組數字改掛在名字底下 ——
-            同分的時候，看的人要能自己看出憑什麼是這個順序。 */
-         (played ? '<div class="tbk">OMW ' + (r.omw * 100).toFixed(1) +
-                   '%　OOMW ' + (r.oomw * 100).toFixed(1) + '%</div>' : '') +
-         '</td>' +
-         '<td>' + r.w + '-' + r.l + (r.d ? '-' + r.d : '') + '</td>' +
-         '<td class="pt">' + r.pts + '</td>' +
-         '<td>' + (r.omw * 100).toFixed(1) + '</td>' +
-         '<td>' + (r.oomw * 100).toFixed(1) + '</td>' +
-         '<td><button class="dropb' + (r.dropped ? ' on' : '') + '" data-id="' + r.id + '">' +
-           (r.dropped ? '已退賽' : '退賽') + '</button></td></tr>';
-  });
-  return h + '</tbody></table>';
+  var v = V.rankView(st, norm(el('rankFind').value), el('rankFind').value);
+  el('rankView').innerHTML = v.html;
+  if (v.title !== null) el('rankTitle').textContent = v.title;
 }
 
 /* 投影 */

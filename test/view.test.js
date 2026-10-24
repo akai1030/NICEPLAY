@@ -85,5 +85,59 @@ head('【4】對戰卡');
   console.log('  排序、搜尋、搜尋結果那一行 ✓');
 }
 
+head('【5】名次表');
+{
+  const E = require('../src/engine.js');
+  const P = [{ id: 'p0', no: 1, name: '王<1>' }, { id: 'p1', no: 2, name: '陳' },
+             { id: 'p2', no: 3, name: '林' }, { id: 'p3', no: 4, name: '李' }];
+  const st = { players: P,
+               matches: [{ round: 1, table: '1', a: 'p0', b: 'p1', result: 'a' },
+                         { round: 1, table: '2', a: 'p2', b: 'p3', result: 'b' }],
+               config: { cut: 2, rules: { win: 3, draw: 1, loss: 0 } } };
+
+  eq(JSON.stringify(V.rankView({ players: [], matches: [], config: {} }, '', '')),
+     JSON.stringify({ html: '<div class="hint">還沒有名單。</div>', title: null }), '還沒有名單：標題不動');
+  eq(V.rankView(st, '', '').title, '即時名次 · 前 2 名晉級', '有晉級人數');
+  eq(V.rankTitle(0), '即時名次', '沒有晉級人數');
+
+  const h = V.rankView(st, '', '').html;
+  eq((h.match(/<tr class="[^"]*">/g) || []).join(' '),
+     '<tr class="cut top4 "> <tr class="cut cutline top4 "> <tr class="top4 "> <tr class="top4 ">',
+     '晉級、晉級線、前四名');
+  ok(h.indexOf('王&lt;1&gt;') > 0, '名字有跳脫');
+  ok(h.indexOf('<div class="tbk">OMW ') > 0, '打過才掛手機版的 OMW 那一行');
+
+  const none = V.rankView({ players: P, matches: [], config: { cut: 0, rules: st.config.rules } }, '', '');
+  ok(none.html.indexOf('tbk') < 0 && none.html.indexOf('top4') < 0, '還沒打就沒有前四名、沒有 OMW 那一行');
+
+  const f = V.rankView(st, '林', '林');
+  eq((f.html.match(/<tr /g) || []).length, 1, '搜尋只留符合的那一列');
+  ok(f.html.indexOf('<td class="rk">4</td>') > 0, '名次照全體算：林輸了、只剩他一列也還是第 4');
+  eq(f.title, '即時名次 · 前 2 名晉級', '搜尋時標題照樣更新');
+  eq(V.rankView(st, 'zz', ' zz< ').html, '<div class="hint">找不到「zz&lt;」。這一份名單上共 4 人。</div>',
+     '找不到：原本打的字去空白、有跳脫');
+  eq((V.rankView(st, '3', '3').html.match(/<tr /g) || []).length, 1, '打編號也找得到');
+
+  const d = JSON.parse(JSON.stringify(st)); d.players[0].dropped = true;
+  const dh = V.rankView(d, '', '').html;
+  ok(dh.indexOf('<tr class="out">') > 0, '退賽的人那一列灰掉、不算晉級');
+  ok(dh.indexOf('<button class="dropb on" data-id="p0">已退賽</button>') > 0, '退賽鈕變「已退賽」');
+
+  const b = JSON.parse(JSON.stringify(st));
+  b.matches.push({ round: 2, table: '1', a: 'p0', b: null, result: 'bye' });
+  ok(V.rankView(b, '', '').html.indexOf('輪空1</span>') > 0, '輪空次數');
+
+  const g = JSON.parse(JSON.stringify(st));
+  g.config.groups = 2; g.config.cut = 4; g.players = E.assignGroups(g.players, 2);
+  const gv = V.rankView(g, '', '');
+  eq(gv.title, '分組名次 · 各組前 2 名晉級', '分組：每組晉級人數＝總數÷組數');
+  eq((gv.html.match(/<h3 class="grp">[^<]*<span>[^<]*<\/span><\/h3>/g) || []).join(''),
+     '<h3 class="grp">A 組　<span>2 人</span></h3><h3 class="grp">B 組　<span>2 人</span></h3>', '各組一個標題');
+  eq((gv.html.match(/<table class="rank">/g) || []).length, 2, '各組一張表');
+  g.config.cut = 0;
+  eq(V.rankView(g, '', '').title, '分組名次', '分組、沒有晉級人數');
+  console.log('  空名單、晉級線、前四名、搜尋、退賽、輪空、分組 ✓');
+}
+
 console.log(fails ? '\n有 ' + fails + ' 項沒過 ❌' : '\n全部通過 ✅');
 process.exit(fails ? 1 : 0);
