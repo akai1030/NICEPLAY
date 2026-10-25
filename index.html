@@ -17,7 +17,7 @@
 <link rel="icon" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" sizes="64x64" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
-<link rel="stylesheet" href="src/style.css?v=202610250827">
+<link rel="stylesheet" href="src/style.css?v=202610250835">
 </head>
 <body>
 
@@ -33,7 +33,7 @@
   <span class="netpill" id="netPill" hidden></span>
   <div class="clock num" id="wallClock">--:--</div>
   <button class="sm" id="btnTheme" title="切換淺色／深色">◐</button>
-  <button class="sm main" id="btnPresent">放大投影 ↗</button>
+  <button class="sm main" id="btnPresent"><span class="wide">放大</span>投影 ↗</button>
 </header>
 
 <nav class="tabs">
@@ -731,18 +731,18 @@
 
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="src/qr.js?v=202610250827"></script>
-<script src="src/engine.js?v=202610250827"></script>
-<script src="src/store.js?v=202610250827"></script>
-<script src="src/net.js?v=202610250827"></script>
-<script src="src/fmt.js?v=202610250827"></script>
-<script src="src/csv.js?v=202610250827"></script>
-<script src="src/view.js?v=202610250827"></script>
-<script src="src/watch.js?v=202610250827"></script>
-<script src="src/present.js?v=202610250827"></script>
-<script src="src/card.js?v=202610250827"></script>
-<script src="src/patch.js?v=202610250827"></script>
-<script src="src/ui.js?v=202610250827"></script>
+<script src="src/qr.js?v=202610250835"></script>
+<script src="src/engine.js?v=202610250835"></script>
+<script src="src/store.js?v=202610250835"></script>
+<script src="src/net.js?v=202610250835"></script>
+<script src="src/fmt.js?v=202610250835"></script>
+<script src="src/csv.js?v=202610250835"></script>
+<script src="src/view.js?v=202610250835"></script>
+<script src="src/watch.js?v=202610250835"></script>
+<script src="src/present.js?v=202610250835"></script>
+<script src="src/card.js?v=202610250835"></script>
+<script src="src/patch.js?v=202610250835"></script>
+<script src="src/ui.js?v=202610250835"></script>
 <script>
 /* 註冊網址一定要帶版本號。Service Worker 是唯一沒辦法用查詢字串
    繞過快取的檔案 —— 瀏覽器只認註冊時的那個網址，而 CDN 會把 sw.js
@@ -750,7 +750,7 @@
    同一個 scope 的舊註冊會被取代掉，不會兩支並存。 */
 if ('serviceWorker' in navigator) {
   addEventListener('load', function () {
-    navigator.serviceWorker.register('sw.js?v=202610250827').then(function (reg) {
+    navigator.serviceWorker.register('sw.js?v=202610250835').then(function (reg) {
       /* 有新版下載好的時候提示一聲，但語氣要輕 ——
          比賽跑到一半沒有人想被催著重整，而且不重整也完全不影響這一場。 */
       reg.addEventListener('updatefound', function () {
