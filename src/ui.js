@@ -136,7 +136,8 @@ function readForm(st) {
   st.config.bo = parseInt(el('fBo').value, 10) || 1;
   st.config.boKO = parseInt(el('fBoKO').value, 10) || 1;
   st.config.tableNaming = el('fNaming').value;
-  st.config.tableCount = parseInt(el('fTables').value, 10) || 0;
+  /* 超過上限照上限存（桌數提示已經講了「會照上限算」）；0＝依人數自動 */
+  st.config.tableCount = Math.min(E.MAX_TABLES, Math.max(0, parseInt(el('fTables').value, 10) || 0));
   st.config.customTables = el('fCustom').value.split(/[,，]/)
     .map(function (s) { return s.trim(); }).filter(Boolean);
   st.config.liveTable = el('fLive').value.trim();

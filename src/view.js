@@ -29,13 +29,19 @@ function rosterHTML(list) {
   }).join('');
 }
 
-/* 桌數提示。n＝還在場上的人數；typed＝桌數欄填的數字（沒填是 NaN，就照人數建議） */
+/* 桌數提示。n＝還在場上的人數；typed＝桌數欄填的數字（沒填是 NaN，就照人數建議）。
+   桌名照設定的桌數產到最後一桌（以前只產 60 個，設 80 桌時尾巴寫的是第 60 桌）。
+   填超過 E.MAX_TABLES 的照上限算 —— readForm 存進去的也是上限 —— 而且在這裡講出來。 */
 function tableHintHTML(n, typed, naming, custom) {
-  var count = typed || E.suggestTables(n);
-  var names = E.makeTables(Math.min(count, 60), naming, custom);
-  var head = names.slice(0, 8).join('、') + (count > 8 ? ' …… ' + names[Math.min(count, 60) - 1] : '');
-  return n + ' 人 → 需要 <b>' + E.suggestTables(n) + '</b> 桌，' +
-    '目前設定 <b>' + count + '</b> 桌：' + esc(head);
+  var need = E.suggestTables(n);
+  var count = typed > 0 ? Math.min(typed, E.MAX_TABLES) : need;
+  var names = E.makeTables(count, naming, custom);
+  var head = names.slice(0, 8).join('、') + (count > 8 ? ' …… ' + names[count - 1] : '');
+  return n + ' 人 → 需要 <b>' + need + '</b> 桌，' +
+    '目前設定 <b>' + count + '</b> 桌：' + esc(head) +
+    (typed > E.MAX_TABLES
+      ? '。桌數最多 <b>' + E.MAX_TABLES + '</b>，填 ' + Number(typed) + ' 會照 ' + E.MAX_TABLES + ' 算'
+      : '');
 }
 
 /* 賽事清單的選項：現在這一場排第一，後面是收起來的那幾場 */
