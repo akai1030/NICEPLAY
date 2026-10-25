@@ -1,0 +1,89 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>NICEPLAY patch</title></head>
+<body style="margin:0;background:#111;color:#eee;font:13px/1.6 monospace">
+<div id="a" hidden></div><div id="b" hidden></div>
+<div id="live"></div>
+<pre id="out">RUNNING</pre>
+<script src="../src/qr.js"></script>
+<script src="../src/engine.js"></script>
+<script src="../src/fmt.js"></script>
+<script src="../src/view.js"></script>
+<script src="../src/patch.js"></script>
+<script>
+/* 局部更新在真瀏覽器裡跟 innerHTML 逐一對照：
+   同一串「先畫 A、再畫 B」，一邊用 innerHTML、一邊用 Patch.patch，
+   兩邊的結果要一模一樣；再確認焦點真的留在原本那顆按鈕上。 */
+(function () {
+  var L = [], fails = 0, n = 0;
+  function say(s) { L.push(s); document.getElementById('out').textContent = L.join('\n'); }
+  function ok(c, m) { if (!c) { fails++; say('  ✗ ' + m); } }
+  var A = document.getElementById('a'), B = document.getElementById('b');
+  /* 容器本身的 id 不一樣，所以逐一比子節點（isEqualNode 連屬性、命名空間、整棵子樹都比；
+     屬性的先後順序由上面那個 innerHTML 字串比對來抓） */
+  function sameKids(x, y) {
+    if (x.childNodes.length !== y.childNodes.length) return false;
+    for (var i = 0; i < x.childNodes.length; i++) if (!x.childNodes[i].isEqualNode(y.childNodes[i])) return false;
+    return true;
+  }
+
+  /* 用真的畫面片段當題目：對戰列表、名次表、桌數提示，外加 QR 與幾個邊界情況 */
+  var st = {
+    event: { host: '桌遊記', name: '週三' },
+    players: [{ id: 'a', no: 1, name: '王<小明>' }, { id: 'b', no: 2, name: '陳' },
+              { id: 'c', no: 3, name: '林' }, { id: 'd', no: 4, name: '李' }, { id: 'e', no: 5, name: '吳' }],
+    matches: [{ round: 1, table: '1', a: 'a', b: 'b', bo: 3, games: [], result: null },
+              { round: 1, table: '2', a: 'c', b: 'd', result: null },
+              { round: 1, table: '3', a: 'e', b: null, result: 'bye' }],
+    config: { cut: 2, liveTable: '1', rules: { win: 3, draw: 1, loss: 0 } }
+  };
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+  function list(s, q) {
+    var rm = Fmt.recMap(s);
+    return View.matchListHTML(s, View.visibleMatches(s, s.matches, false, q || ''), rm, '');
+  }
+  function rank(s, q) { return View.rankView(s, q || '', q || '').html; }
+
+  var s1 = clone(st);
+  var s2 = clone(st); s2.matches[0].games = ['a']; s2.matches[1].result = 'b';
+  var s3 = clone(s2); s3.matches[0].games = ['a', 'a']; s3.matches[0].result = 'a'; s3.config.liveTable = '2';
+
+  var seq = [
+    ['對戰列表：回報一局、回報一桌、打完一桌', [list(s1), list(s2), list(s3), list(s1)]],
+    ['對戰列表：搜尋縮成一桌又放回來', [list(s2), list(s2, '陳'), list(s2, 'zz'), list(s2)]],
+    ['名次表：成績變動、搜尋、找不到', [rank(s1), rank(s3), rank(s3, '林'), rank(s3, 'zz'), rank(s1)]],
+    ['桌數提示', [View.tableHintHTML(10, NaN, 'number', []), View.tableHintHTML(30, 0, 'letter', []),
+                  View.tableHintHTML(10, 3, 'custom', ['A', 'B<'])]],
+    ['QR：換網址、同一條網址', [QR.svg('https://x/#join=AAAA', { size: 120 }), QR.svg('https://x/#join=BBBB', { size: 120 }),
+                                 QR.svg('https://x/#join=BBBB', { size: 120 })]],
+    ['邊界：空字串、純文字、文字與元素交錯', ['', '只有字', '<b>粗</b>中間<i>斜</i>', '中間<b>粗</b>', '']]
+  ];
+
+  seq.forEach(function (c) {
+    A.innerHTML = ''; B.innerHTML = '';
+    c[1].forEach(function (html, i) {
+      n++;
+      A.innerHTML = html;
+      Patch.patch(B, html);
+      ok(A.innerHTML === B.innerHTML && sameKids(A, B), c[0] + ' 第 ' + (i + 1) + ' 步跟 innerHTML 不一樣');
+    });
+  });
+  say('  跟 innerHTML 對照 ' + n + ' 步 ✓');
+
+  /* 焦點：按 Enter 回報之後，焦點要留在剛剛那顆按鈕上，← → 才接得下去 */
+  var live = document.getElementById('live');
+  Patch.patch(live, list(s1));
+  var btn = live.querySelector('[data-t="2"][data-r="b"]');
+  btn.focus();
+  ok(document.activeElement === btn, '先把焦點放上去');
+  Patch.patch(live, list(s2));
+  ok(document.activeElement === btn, '回報之後焦點還在同一顆按鈕');
+  ok(btn.classList.contains('win') && btn.getAttribute('aria-pressed') === 'true', '那顆按鈕已經更新成「贏」');
+  live.innerHTML = list(s3);
+  ok(document.activeElement === document.body, '對照組：換 innerHTML 焦點就掉回 body');
+  say('  焦點留在原本的按鈕 ✓');
+
+  say(fails === 0 ? '局部更新全部通過 ✅' : '有 ' + fails + ' 項失敗 ❌');
+  say('DONE');
+})();
+</script>
+</body></html>

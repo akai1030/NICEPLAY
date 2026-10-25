@@ -56,92 +56,34 @@ var net = window.Net.create({
   server: localStorage.getItem(SRV_KEY) || DEFAULT_SERVER,
   onState: function (remote, role) {
     /* 伺服器來的整份狀態直接取代本機。主控與加入者都吃這條，
-       所以「傳整份快照」的自癒特性在兩邊都成立。 */
+       所以「傳整份快照」的自癒特性在兩邊都成立。
+       store.replace 會先用 store.js 的 clean 整理過（壞 id 丟掉、數字轉整數）。 */
     applyingRemote = true;
     try { store.replace(remote); } finally { applyingRemote = false; }
   },
   onStatus: function (s) { paintNet(s); }
 });
 
-/* ── 小工具 ─────────────────────────────────────────── */
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-  });
-}
-function pad(n) { return (n < 10 ? '0' : '') + n; }
-function fmtCount(ms) {
-  var neg = ms < 0; if (neg) ms = -ms;
-  var s = Math.floor(ms / 1000);
-  var t = s >= 3600
-    ? Math.floor(s / 3600) + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60)
-    : pad(Math.floor(s / 60)) + ':' + pad(s % 60);
-  return (neg ? '+' : '') + t;
-}
+/* ── 小工具 ───────────────────────────────────────────
+   純函式在 fmt.js（小工具）、csv.js、view.js（控制台）、watch.js（選手）、
+   present.js（投影）、card.js（成績單）；這裡用短名接過來，
+   常用的小工具再用原本的名字接一次，下面的寫法照舊。 */
+var F = window.Fmt, C = window.Csv, V = window.View, Wt = window.Watch, Pv = window.Present,
+    Card = window.Card;
+/* 有輸入框牽動的那幾塊（對戰列表、名次表、桌數提示）用 patch 取代 innerHTML：
+   畫出來一樣，但沒變的按鈕留著，鍵盤焦點不會每回報一下就掉回 <body>。見 patch.js */
+var patch = window.Patch.patch;
+var esc = F.esc, pad = F.pad, fmtCount = F.fmtCount, nameOf = F.nameOf,
+    recMap = F.recMap, currentRound = F.currentRound, matchesOf = F.matchesOf,
+    roundLabel = F.roundLabel, formatLabel = F.formatLabel, fileStem = F.fileStem,
+    norm = F.norm;
+
 function toast(msg, bad) {
   var t = el('toast');
   t.textContent = msg;
   t.className = 'on' + (bad ? ' bad' : '');
   clearTimeout(toast._t);
   toast._t = setTimeout(function () { t.className = ''; }, bad ? 5200 : 3200);
-}
-function nameOf(st, id) {
-  if (id === null || id === undefined) return '輪空';
-  for (var i = 0; i < st.players.length; i++) if (st.players[i].id === id) return st.players[i].name;
-  return '？';
-}
-function numOf(st, id) {
-  for (var i = 0; i < st.players.length; i++) if (st.players[i].id === id) return st.players[i].no;
-  return '';
-}
-function alive(st) { return st.players.filter(function (p) { return !p.dropped; }); }
-
-/* 每個人的戰績查表。名字後面隨時看得到幾勝幾敗 ——
-   現場最常被問的就是這個，而且會被問到主辦沒空排下一輪。
-   算一次給整個畫面共用，不要每張卡各算一次。 */
-function recMap(st) {
-  var out = {};
-  try {
-    E.standings(st.players, st.matches, st.config.rules).forEach(function (x) {
-      out[x.id] = { rec: x.w + '-' + x.l + (x.d ? '-' + x.d : ''), pts: x.pts, rank: x.rank };
-    });
-  } catch (e) {}
-  return out;
-}
-
-/* 目前這一輪的 key（數字或「八強」這種字串） */
-function currentRound(st) {
-  if (!st.matches.length) return null;
-  return st.matches[st.matches.length - 1].round;
-}
-function matchesOf(st, round) {
-  return st.matches.filter(function (m) { return m.round === round; });
-}
-/* 輪次名稱。雙敗的 W1 / L4 / F 對現場沒有意義，一律翻成人話。 */
-function roundLabel(r) {
-  if (typeof r === 'number') return '第 ' + r + ' 輪';
-  return /^[WL]\d+$|^F2?$/.test(r) ? E.koName(r) : r;
-}
-
-/* 賽制寫成人話。紙本與檔名都用得到 —— 印出來貼在櫃檯的那張，
-   要讓沒參加的人也看得懂這是什麼比賽。 */
-function formatLabel(cfg) {
-  var f = cfg.format;
-  var base = f === 'roundrobin' ? '循環賽'
-           : f === 'single' ? '單敗淘汰'
-           : f === 'double' ? '雙敗淘汰'
-           : '瑞士制 ' + cfg.rounds + ' 輪';
-  if (f === 'swiss' && cfg.cut >= 2) base += '＋前 ' + cfg.cut + ' 名淘汰賽';
-  var bo = cfg.bo || 1, bk = cfg.boKO || 1;
-  if (f === 'single' || f === 'double') return base + '　BO' + bk;
-  if (bo === bk || !cfg.cut) return base + '　BO' + bo;
-  return base + '　常規 BO' + bo + '／淘汰 BO' + bk;
-}
-
-/* 檔名前綴：主辦_賽事_日期。存成一整個資料夾之後才分得出哪張是哪場。 */
-function fileStem(st) {
-  return [st.event.host, st.event.name || 'niceplay', st.event.date]
-    .filter(Boolean).join('_').replace(/[\\/:*?"<>|\s]+/g, '_');
 }
 
 /* ── 分頁 ───────────────────────────────────────────── */
@@ -228,35 +170,16 @@ function syncFormatFields() {
 
 /* 幾勝制講清楚兩件現場一定會問的事：要贏幾局、平手怎麼算 */
 function boHintText(hasNormal, hasKO) {
-  var parts = [];
-  if (hasNormal) parts.push('常規賽 ' + boWord(parseInt(el('fBo').value, 10) || 1));
-  if (hasKO) parts.push('淘汰賽 ' + boWord(parseInt(el('fBoKO').value, 10) || 1));
-  if (f === 'double') {
-    parts.push('雙敗：輸一場掉敗部，敗部再輸才結束。' +
-               '總決賽如果是敗部冠軍贏，兩邊都只輸一場，會自動加賽一場');
-  }
-  if (!parts.length) return '';
-  return parts.join('　·　') + '<br>' +
-    '對戰卡上點誰贏，就記他一局；打滿還沒有人過半就算平手（BO2 的 1-1、BO3 的 1-1-1）。' +
-    '點錯用卡片右邊的「退一局」往回退。<b>每一場的幾勝制在排出來的當下就定了</b> —— ' +
-    '中途改設定只影響之後排的輪次，已經打完的不會被改寫。';
-}
-function boWord(bo) {
-  if (bo <= 1) return '<b>BO1</b>　一局定勝負';
-  return '<b>BO' + bo + '</b>　先贏 ' + E.winsNeeded(bo) + ' 局' +
-         (bo % 2 === 0 ? '，' + (bo / 2) + '-' + (bo / 2) + ' 算平手' : '');
+  return F.boHint(hasNormal, hasKO, parseInt(el('fBo').value, 10) || 1,
+                  parseInt(el('fBoKO').value, 10) || 1, el('fFormat').value);
 }
 
 function updateTableHint(st) {
   st = st || store.get();
   var n = (drafting || st.players).filter(function (p) { return !p.dropped; }).length;
   if (!n) { el('tableHint').textContent = '先讀入名單，系統會依人數自動建議桌數。'; return; }
-  var count = parseInt(el('fTables').value, 10) || E.suggestTables(n);
-  var names = E.makeTables(Math.min(count, 60), el('fNaming').value,
-    el('fCustom').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean));
-  var head = names.slice(0, 8).join('、') + (count > 8 ? ' …… ' + names[Math.min(count, 60) - 1] : '');
-  el('tableHint').innerHTML = n + ' 人 → 需要 <b>' + E.suggestTables(n) + '</b> 桌，' +
-    '目前設定 <b>' + count + '</b> 桌：' + esc(head);
+  patch(el('tableHint'), V.tableHintHTML(n, parseInt(el('fTables').value, 10), el('fNaming').value,
+    el('fCustom').value.split(/[,，]/).map(function (s) { return s.trim(); }).filter(Boolean)));
 }
 
 /* ── 名單 ─────────────────────────────────────────────
@@ -339,10 +262,7 @@ el('btnParse').onclick = function () {
 };
 
 function paintRoster(list) {
-  el('rosterView').innerHTML = list.map(function (p) {
-    return '<div class="nm' + (p.dropped ? ' out' : '') + '"><i>' + p.no + '</i>' +
-           '<span>' + esc(p.name) + '</span></div>';
-  }).join('');
+  el('rosterView').innerHTML = V.rosterHTML(list);
 }
 
 /* ── 開始比賽 ───────────────────────────────────────── */
@@ -390,35 +310,19 @@ el('btnStartHere').onclick = startEvent;
    開著房的時候切換，房間會跟著換成新的那一場 —— 房號不變，
    所以副控與選手的畫面會整個換掉。那通常正是想要的（同一臺筆電
    接著辦下一場），但要先講一聲。 */
-function eventTitle(e) {
-  var bits = [e.host, e.name || '（未命名）', e.date].filter(Boolean).join('　');
-  var tail = e.players ? '　' + e.players + ' 人' : '';
-  if (e.rounds) tail += ' · ' + e.rounds + ' 輪';
-  return bits + tail;
-}
 
 function paintEvents(st) {
   var lib = S.libLoad();
-  var opts = ['<option value="' + esc(st.id) + '">' +
-              esc(eventTitle({ host: st.event.host, name: st.event.name, date: st.event.date,
-                               players: st.players.length,
-                               rounds: E.countRounds(st.matches) })) +
-              '　←　現在</option>'];
-  lib.forEach(function (e) {
-    opts.push('<option value="' + esc(e.id) + '">' + esc(eventTitle(e)) + '</option>');
-  });
   /* 每次 render 都重建 <select> 會把使用者正在拉開的選單關掉 ——
      內容真的變了才重畫。 */
-  var sig = opts.join('');
+  var sig = V.eventOptionsHTML(st, lib);
   if (el('fEvent')._sig !== sig) {
     el('fEvent')._sig = sig;
     el('fEvent').innerHTML = sig;
   }
   el('fEvent').value = st.id;
   el('btnDelEvent').disabled = !lib.length;   /* 只剩一場就不給刪，免得刪到空 */
-  el('eventHint').innerHTML = lib.length
-    ? '另外還有 <b>' + lib.length + '</b> 場存在這臺電腦裡。切換不會動到任何一場的成績。'
-    : '目前只有這一場。按「新增一場」會把現在這場收起來，開一個全新的。';
+  el('eventHint').innerHTML = V.eventHintHTML(lib.length);
 }
 
 function switchEvent(id) {
@@ -841,22 +745,11 @@ el('btnReset').onclick = function () {
   });
 };
 /* ── 匯出 CSV ─────────────────────────────────────────
-   店家事後要把成績貼進 Excel、或上傳到官方系統，所以給的是
-   「打得開就能用」的檔：欄位固定、有 BOM（不然 Excel 會把中文變亂碼）、
-   換行用 CRLF（Windows 的 Excel 才不會擠成一行）。 */
-function csvCell(s) {
-  s = String(s === null || s === undefined ? '' : s);
-  /* 以 = + - @ 開頭的字會被 Excel 當成公式執行 —— 有人取名叫「=1+1」
-     不是惡意也會壞掉，真的有心的話那是一條注入路徑。
-     前面補一個單引號，Excel 就當純文字，顯示出來還是原本的字。 */
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
+   要寫哪幾欄、每格怎麼跳脫在 csv.js；這裡只管下載。 */
 function downloadCSV(rows, suffix) {
   var st = store.get();
   var name = fileStem(st) + '_' + suffix + '.csv';
-  var text = rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n');
-  var blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
+  var blob = new Blob([C.csvText(rows)], { type: 'text/csv;charset=utf-8' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -868,38 +761,13 @@ function downloadCSV(rows, suffix) {
 el('btnCsvRank').onclick = function () {
   var st = store.get();
   if (!st.players.length) { toast('還沒有名單', true); return; }
-  var out = [['名次', '編號', '選手', '勝', '敗', '平手', '輪空', '積分',
-              'OMW%', 'OOMW%', '狀態']];
-  E.standings(st.players, st.matches, st.config.rules).forEach(function (r) {
-    out.push([r.rank, r.no, r.name, r.w, r.l, r.d, r.byes, r.pts,
-              (r.omw * 100).toFixed(1), (r.oomw * 100).toFixed(1),
-              r.dropped ? '退賽' : '']);
-  });
-  downloadCSV(out, '名次');
+  downloadCSV(C.rankRows(st), '名次');
 };
 
-/* 對戰紀錄：一場一列，含小局比分 —— BO3 打成 2-1 的話兩邊都看得到。 */
 el('btnCsvLog').onclick = function () {
   var st = store.get();
   if (!st.matches.length) { toast('還沒有對戰紀錄', true); return; }
-  var out = [['輪次', '桌號', '幾勝制', '選手A編號', '選手A', '選手B編號', '選手B',
-              '結果', 'A小局', 'B小局', '和局', '逐局']];
-  st.matches.forEach(function (m) {
-    var g = E.tallyGames(E.gamesOf(m));
-    var bye = (m.b === null || m.b === undefined);
-    var res = bye ? '輪空（視同勝）'
-            : m.result === 'a' ? nameOf(st, m.a) + ' 勝'
-            : m.result === 'b' ? nameOf(st, m.b) + ' 勝'
-            : m.result === 'draw' ? '平手' : '未回報';
-    out.push([roundLabel(m.round), m.table, 'BO' + (m.bo || 1),
-              bye ? '' : numOf(st, m.a), nameOf(st, m.a),
-              bye ? '' : numOf(st, m.b), bye ? '' : nameOf(st, m.b),
-              res, bye ? '' : g.a, bye ? '' : g.b, bye ? '' : g.draw,
-              bye ? '' : E.gamesOf(m).map(function (x) {
-                return x === 'a' ? 'A' : (x === 'b' ? 'B' : '和');
-              }).join('')]);
-  });
-  downloadCSV(out, '對戰紀錄');
+  downloadCSV(C.logRows(st), '對戰紀錄');
 };
 
 /* ── 桌卡 ─────────────────────────────────────────────
@@ -909,21 +777,10 @@ el('btnCsvLog').onclick = function () {
 el('btnTents').onclick = function () {
   var st = store.get(), r = currentRound(st);
   if (r === null) { toast('還沒排對戰，沒有桌卡可以印', true); return; }
-  var ms = matchesOf(st, r).filter(function (m) { return m.b !== null && m.b !== undefined; })
-                           .sort(byTableName);
+  var ms = V.tentMatches(st, r);
   if (!ms.length) { toast('這一輪沒有要坐桌的場次', true); return; }
 
-  var head = [st.event.host, st.event.name].filter(Boolean).join('　·　');
-  el('tents').innerHTML = ms.map(function (m) {
-    var bo = m.bo || 1;
-    return '<div class="tent">' +
-      '<div class="tent-hd">' + esc(head) + '<b>' + esc(roundLabel(m.round)) + '</b></div>' +
-      '<div class="tent-no">' + esc(m.table) + '</div>' +
-      '<div class="tent-p"><i>' + numOf(st, m.a) + '</i>' + esc(nameOf(st, m.a)) + '</div>' +
-      '<div class="tent-vs">VS' + (bo > 1 ? '　·　BO' + bo + '　先贏 ' + E.winsNeeded(bo) + ' 局' : '') + '</div>' +
-      '<div class="tent-p"><i>' + numOf(st, m.b) + '</i>' + esc(nameOf(st, m.b)) + '</div>' +
-      '</div>';
-  }).join('');
+  el('tents').innerHTML = V.tentsHTML(st, ms);
 
   document.body.classList.add('print-tents');
   setTimeout(function () {
@@ -1111,235 +968,41 @@ function paintWatch(st) {
   el('wtRound').textContent = r === null ? '尚未開始' : roundLabel(r);
   el('wtCode').textContent = net.code ? '查詢碼 ' + net.code : '';
 
-  var me = null;
-  st.players.forEach(function (p) { if (p.id === meId) me = p; });
+  var me = Wt.findMe(st, meId);
 
   el('wtPick').hidden = !!me;
   el('wtMe').hidden = !me;
 
   if (!me) {
-    el('meList').innerHTML = st.players.map(function (p) {
-      return '<div class="nm" data-id="' + p.id + '"><i>' + p.no + '</i>' +
-             '<span>' + esc(p.name) + '</span></div>';
-    }).join('') || '<div class="hint">主辦還沒讀入名單。</div>';
+    el('meList').innerHTML = Wt.pickListHTML(st.players);
   } else {
     el('wtPlayer').textContent = me.name;
-
-    var mine = null;
-    matchesOf(st, r).forEach(function (m) { if (m.a === meId || m.b === meId) mine = m; });
-
-    if (!mine) {
-      el('wtLead').textContent = ''; el('wtTail').textContent = '';
-      el('wtTable').textContent = r === null ? '尚未開始' : '本輪沒有你的場次';
-      el('wtTable').style.fontSize = '26px';
-      el('wtOpp').textContent = '';
-    } else if (mine.b === null || mine.b === undefined) {
-      el('wtLead').textContent = '本輪'; el('wtTail').textContent = '';
-      el('wtTable').textContent = '輪空';
-      el('wtTable').style.fontSize = '';
-      el('wtOpp').innerHTML = '這一輪不用打，直接算一勝。';
-    } else {
-      el('wtLead').textContent = '你在第'; el('wtTail').textContent = '桌';
-      el('wtTable').textContent = mine.table;
-      el('wtTable').style.fontSize = '';
-      var oppId = (mine.a === meId) ? mine.b : mine.a;
-      var res = mine.result;
-      var mineIsA = (mine.a === meId);
-      var tail = !res ? '' :
-        res === 'draw' ? '　<b>平手</b>' :
-        ((res === 'a') === mineIsA ? '　<b>你贏了</b>' : '　你輸了');
-      /* BO 制要看得到目前幾比幾 —— 選手最想知道的就是「還差幾局」 */
-      var mbo = mine.bo || 1;
-      if (mbo > 1) {
-        var mg = E.tallyGames(E.gamesOf(mine));
-        tail += '　<span class="sc">' + (mineIsA ? mg.a + '-' + mg.b : mg.b + '-' + mg.a) +
-                (mg.draw ? '（平 ' + mg.draw + '）' : '') +
-                '　BO' + mbo + '　先贏 ' + E.winsNeeded(mbo) + ' 局</span>';
-      }
-      el('wtOpp').innerHTML = '對手　<b>' + esc(nameOf(st, oppId)) + '</b>' + tail;
-    }
-
-    var rows = E.standings(st.players, st.matches, st.config.rules);
-    var row = null;
-    rows.forEach(function (x) { if (x.id === meId) row = x; });
-    el('wtStat').textContent = row
-      ? '目前第 ' + row.rank + ' 名　' + row.w + ' 勝 ' + row.l + ' 敗' +
-        (row.d ? ' ' + row.d + ' 平' : '') + '　' + row.pts + ' 分'
-      : '';
+    var t = Wt.myTable(st, r, meId);
+    el('wtLead').textContent = t.lead; el('wtTail').textContent = t.tail;
+    el('wtTable').textContent = t.table;
+    el('wtTable').style.fontSize = t.small ? '26px' : '';
+    el('wtOpp').innerHTML = t.opp;
+    el('wtStat').textContent = Wt.statText(st, meId);
   }
 
-  /* 成績單只在真的有成績之後才出現 —— 還沒打就給一張空的沒有意義 */
-  var played = me && st.matches.some(function (m) {
-    return (m.a === meId || m.b === meId) && m.result;
-  });
+  var played = me && Wt.hasPlayed(st, meId);
   el('wtCardSec').hidden = !played;
   if (played) { try { drawCard(st, me); } catch (e) { el('wtCardSec').hidden = true; } }
 
-  /* 我的每一輪：打過誰、幾比幾。輪空也要列出來，不然選手會以為漏了一輪。 */
-  var mine = me ? st.matches.filter(function (m) { return m.a === meId || m.b === meId; }) : [];
+  var mine = me ? Wt.myMatches(st, meId) : [];
   el('wtMineSec').hidden = !mine.length;
-  if (mine.length) {
-    el('wtMine').innerHTML = mine.map(function (m) {
-      var bye = (m.b === null || m.b === undefined);
-      var iAmA = (m.a === meId);
-      var g = E.tallyGames(E.gamesOf(m));
-      var oppId = iAmA ? m.b : m.a;
-      var win = !bye && m.result && m.result !== 'draw' && ((m.result === 'a') === iAmA);
-      var lose = !bye && m.result && m.result !== 'draw' && !win;
-      var tag = bye ? '<span class="s">輪空 · 視同勝</span>'
-              : !m.result ? '<span class="s">進行中</span>'
-              : m.result === 'draw' ? '<span class="s">平手</span>'
-              : '<span class="s">' + (win ? '勝' : '敗') + '</span>';
-      var sc = (!bye && (m.bo || 1) > 1)
-             ? '<span class="s sc">' + (iAmA ? g.a + '-' + g.b : g.b + '-' + g.a) + '</span>' : '';
-      return '<div class="wr' + (win ? ' won' : lose ? ' lost' : '') + '">' +
-        '<span class="t">' + esc(String(roundLabel(m.round)).replace('第 ', '').replace(' 輪', '')) + '</span>' +
-        '<span class="p">' + (bye ? '—' : esc(nameOf(st, oppId))) + '</span>' + sc + tag +
-        '</div>';
-    }).join('');
-  }
+  if (mine.length) el('wtMine').innerHTML = Wt.myRoundsHTML(st, mine, meId);
 
-  /* 本輪對戰（唯讀） */
   var ms = (r === null) ? [] : matchesOf(st, r);
-  el('wtMatchTitle').textContent = r === null ? '本輪對戰' : roundLabel(r) + '　對戰';
-  var wrm = recMap(st);
-  /* 這裡不要再用 r 當變數名 —— 外面的 r 是「第幾輪」 */
-  var who = function (id, cls) {
-    var rec = wrm[id];
-    return '<span class="p' + cls + '">' + esc(nameOf(st, id)) +
-           (rec ? '<em class="num">' + rec.rec + '</em>' : '') + '</span>';
-  };
-  el('wtMatches').innerHTML = ms.length ? ms.map(function (m) {
-    var isMine = (m.a === meId || m.b === meId);
-    var bye = (m.b === null || m.b === undefined);
-    var ca = m.result === 'a' ? ' win' : (m.result === 'b' ? ' lose' : '');
-    var cb = m.result === 'b' ? ' win' : (m.result === 'a' ? ' lose' : '');
-    var mg = E.tallyGames(E.gamesOf(m));
-    var sc = (m.bo || 1) > 1 ? '<span class="x sc">' + mg.a + '-' + mg.b + '</span>' : '<span class="x">VS</span>';
-    return '<div class="wr' + (isMine ? ' mine' : '') + '">' +
-      '<span class="t">' + esc(m.table) + '</span>' + who(m.a, ca) +
-      (bye ? '<span class="s">輪空</span>' : sc + who(m.b, cb)) +
-      '</div>';
-  }).join('') : '<div class="hint">還沒排對戰。</div>';
-
-  /* 名次（唯讀） */
-  var rk = E.standings(st.players, st.matches, st.config.rules);
-  el('wtRank').innerHTML = rk.length ? rk.map(function (x) {
-    return '<div class="wr' + (x.id === meId ? ' mine' : '') + '">' +
-      '<span class="n">' + x.rank + '</span>' +
-      '<span class="p">' + esc(x.name) + (x.dropped ? '（退賽）' : '') + '</span>' +
-      '<span class="s">' + x.w + '-' + x.l + (x.d ? '-' + x.d : '') + '</span>' +
-      '<span class="s">' + x.pts + ' 分</span>' +
-      '</div>';
-  }).join('') : '<div class="hint">還沒有成績。</div>';
+  el('wtMatchTitle').textContent = Wt.matchTitle(r);
+  el('wtMatches').innerHTML = Wt.roundMatchesHTML(st, ms, meId);
+  el('wtRank').innerHTML = Wt.rankHTML(st, meId);
 }
 
 /* ── 賽後成績單 ───────────────────────────────────────
-   選手會自己轉發的東西 —— 對店家等於免費宣傳，所以主辦單位要在上面。
-   用 Canvas 畫而不是截圖：截圖會把手機的狀態列、瀏覽器網址列一起帶進去，
-   而且每支手機的比例都不一樣。這裡固定 1080×1350（IG 直式），
-   誰的手機畫出來都一樣。 */
+   怎麼畫在 card.js；這裡只負責找到那張畫布。 */
 function drawCard(st, me) {
-  var cv = el('wtCard'), g = cv.getContext('2d');
-  var W = cv.width, H = cv.height;
-  var dark = st.theme !== 'light';
-  var bg = dark ? '#0B0D12' : '#FFFFFF';
-  var fg = dark ? '#FFFFFF' : '#0B0D12';
-  var dim = dark ? 'rgba(255,255,255,.62)' : 'rgba(11,13,18,.62)';
-  var line = dark ? 'rgba(255,255,255,.16)' : 'rgba(11,13,18,.14)';
-  var CN = '"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
-  var MO = '"SF Mono",Menlo,Consolas,monospace';
-
-  g.fillStyle = bg; g.fillRect(0, 0, W, H);
-
-  /* 頂部品牌漸層條 —— 全站唯一用漸層的地方，成績單也照這條規矩 */
-  var grad = g.createLinearGradient(0, 0, W, 0);
-  grad.addColorStop(0, '#2563FF'); grad.addColorStop(.52, '#A855F7');
-  grad.addColorStop(1, '#FF2ED1');
-  g.fillStyle = grad; g.fillRect(0, 0, W, 16);
-
-  var rows = E.standings(st.players, st.matches, st.config.rules);
-  var mine = null;
-  rows.forEach(function (r) { if (r.id === me.id) mine = r; });
-  if (!mine) return;
-
-  var y = 120;
-  g.textAlign = 'left';
-  g.fillStyle = dim; g.font = '34px ' + CN;
-  g.fillText([st.event.host, st.event.name].filter(Boolean).join('　·　') || 'NICEPLAY', 80, y);
-  y += 54;
-  g.fillStyle = dim; g.font = '30px ' + MO;
-  g.fillText(st.event.date || '', 80, y);
-
-  /* 名次：整張圖最大的一個數字 */
-  y += 170;
-  g.fillStyle = fg; g.font = '900 220px ' + MO;
-  g.fillText(String(mine.rank), 80, y);
-  var w = g.measureText(String(mine.rank)).width;
-  g.fillStyle = dim; g.font = '44px ' + CN;
-  g.fillText('名', 80 + w + 20, y);
-
-  y += 90;
-  g.fillStyle = fg; g.font = '900 76px ' + CN;
-  g.fillText(me.name, 80, y);
-  if (me.team) {
-    y += 52;
-    g.fillStyle = dim; g.font = '36px ' + CN;
-    g.fillText(me.team, 80, y);
-  }
-
-  y += 80;
-  g.strokeStyle = line; g.lineWidth = 2;
-  g.beginPath(); g.moveTo(80, y); g.lineTo(W - 80, y); g.stroke();
-
-  /* 三個數字並排 */
-  y += 100;
-  var stats = [
-    [mine.w + '-' + mine.l + (mine.d ? '-' + mine.d : ''), '戰績'],
-    [String(mine.pts), '積分'],
-    [(mine.omw * 100).toFixed(1), 'OMW%']
-  ];
-  stats.forEach(function (s, i) {
-    var x = 80 + i * ((W - 160) / 3);
-    g.fillStyle = fg; g.font = '700 68px ' + MO;
-    g.fillText(s[0], x, y);
-    g.fillStyle = dim; g.font = '30px ' + CN;
-    g.fillText(s[1], x, y + 44);
-  });
-
-  /* 每一輪打了誰 */
-  y += 130;
-  g.fillStyle = dim; g.font = '30px ' + MO;
-  g.fillText('EVERY ROUND', 80, y);
-  y += 20;
-  var mineMs = st.matches.filter(function (m) { return m.a === me.id || m.b === me.id; });
-  mineMs.slice(0, 9).forEach(function (m) {
-    y += 62;
-    var bye = (m.b === null || m.b === undefined);
-    var iAmA = (m.a === me.id);
-    var opp = bye ? '—' : nameOf(st, iAmA ? m.b : m.a);
-    var gm = E.tallyGames(E.gamesOf(m));
-    var tag = bye ? (m.result === 'noshow' ? '未到' : '輪空')
-            : !m.result ? '進行中'
-            : m.result === 'draw' ? '平手'
-            : (((m.result === 'a') === iAmA) ? '勝' : '敗');
-    g.fillStyle = dim; g.font = '34px ' + MO;
-    g.fillText(String(roundLabel(m.round)), 80, y);
-    g.fillStyle = fg; g.font = '38px ' + CN;
-    g.fillText(opp, 260, y);
-    g.textAlign = 'right';
-    if (!bye && (m.bo || 1) > 1) {
-      g.fillStyle = dim; g.font = '32px ' + MO;
-      g.fillText(iAmA ? gm.a + '-' + gm.b : gm.b + '-' + gm.a, W - 200, y);
-    }
-    g.fillStyle = (tag === '勝') ? '#FF2ED1' : dim;
-    g.font = '700 36px ' + CN;
-    g.fillText(tag, W - 80, y);
-    g.textAlign = 'left';
-  });
-
-  g.fillStyle = dim; g.font = '28px ' + MO;
-  g.fillText('NICEPLAY · niceplay.transtation.org', 80, H - 60);
+  Card.draw(el('wtCard'), st, me);
 }
 
 el('btnWtCard').onclick = function () {
@@ -1641,10 +1304,7 @@ function render(st) {
       ? '這 ' + st.players.length + ' 位都在了，確認沒問題就直接開賽 —— 系統會排好第一輪。'
       : '只有 1 位選手，至少要兩位才排得出對戰。';
   /* 名單就列在這裡，不用切回設定頁確認 */
-  el('playEmptyList').innerHTML = st.players.map(function (p) {
-    return '<div class="nm' + (p.dropped ? ' out' : '') + '"><i>' + p.no + '</i>' +
-           '<span>' + esc(p.name) + '</span></div>';
-  }).join('');
+  el('playEmptyList').innerHTML = V.rosterHTML(st.players);
   el('btnStartHere').hidden = !ready;
   /* 還沒排對戰的時候，進度條與那排動作按鈕沒有東西可以操作 ——
      留著只會讓人以為「下一輪」才是開賽的按鈕。 */
@@ -1677,29 +1337,12 @@ var SORT_KEY = 'niceplay.sort';
 function sortMode() {
   return localStorage.getItem(SORT_KEY) === 'table' ? 'table' : 'rank';
 }
-/* 桌號可能是 1、2、10，也可能是 A、B，或自訂的 Q1。
-   純數字要照數值比（不然 10 會排在 2 前面），其餘照字面。 */
-function byTableName(x, y) {
-  var a = String(x.table), b = String(y.table);
-  var na = /^\d+$/.test(a), nb = /^\d+$/.test(b);
-  if (na && nb) return parseInt(a, 10) - parseInt(b, 10);
-  if (na !== nb) return na ? -1 : 1;
-  return a.localeCompare(b, 'zh-Hant');
-}
-function norm(s) { return String(s || '').trim().toLowerCase(); }
-function matchMatches(st, m, q) {
-  if (norm(m.table).indexOf(q) >= 0) return true;
-  return [m.a, m.b].some(function (id) {
-    if (id === null || id === undefined) return false;
-    return norm(nameOf(st, id)).indexOf(q) >= 0 || String(numOf(st, id)) === q;
-  });
-}
 
 /* 對戰列表 */
 function paintMatches(st) {
   var r = currentRound(st);
   if (r === null) {
-    el('matchList').innerHTML = '<div class="hint">還沒開始。到「設定」讀入名單後按「開始比賽」。</div>';
+    patch(el('matchList'), '<div class="hint">還沒開始。到「設定」讀入名單後按「開始比賽」。</div>');
     el('progDone').textContent = '0/0';
     el('progRound').textContent = '—';
     el('progBar').style.width = '0';
@@ -1721,324 +1364,46 @@ function paintMatches(st) {
 
   /* 排序與搜尋只影響「看到什麼」，不影響進度數字 ——
      篩選之後如果連 0/8 都跟著變，那個數字就沒有意義了。 */
-  var view = ms.slice();
-  if (sortMode() === 'table') view.sort(byTableName);
   var q = norm(el('playFind').value);
-  if (q) view = view.filter(function (m) { return matchMatches(st, m, q); });
-  el('playFindMsg').textContent = q
-    ? (view.length ? '符合的 ' + view.length + ' 桌（共 ' + ms.length + ' 桌）'
-                   : '找不到「' + el('playFind').value.trim() + '」')
-    : '';
+  var view = V.visibleMatches(st, ms, sortMode() === 'table', q);
+  el('playFindMsg').textContent = V.findMsg(q, el('playFind').value, view.length, ms.length);
 
-  var rm = recMap(st);
-  el('matchList').innerHTML = view.map(function (m) {
-    var live = st.config.liveTable && m.table === st.config.liveTable;
-    var mine = net.role === 'watch' && meId && (m.a === meId || m.b === meId);
-    var bo = m.bo || 1;
-    var g = E.tallyGames(E.gamesOf(m));
-    var h = '<div class="mt' + (m.result ? ' done' : '') + (live ? ' islive' : '') +
-            (mine ? ' mine' : '') + (bo > 1 ? ' bo' : '') + '">' +
-            '<div class="tb">' + esc(m.table) + '</div>';
-    h += side(st, m, 'a', rm, bo, g);
-    if (m.b === null || m.b === undefined) {
-      /* 輪空不能點，所以維持 div —— 按不下去的按鈕對鍵盤與螢幕閱讀器
-         都是雜訊，Tab 會停在一個什麼都不會發生的地方。 */
-      h += '<div class="sd bye">輪空 · 視同勝</div>';
-    } else {
-      h += '<button type="button" class="dw' + (m.result === 'draw' ? ' on' : '') +
-           '" data-t="' + esc(m.table) + '" data-r="draw"' +
-           ' aria-label="第 ' + esc(m.table) + ' 桌　記一次平手"' +
-           ' aria-pressed="' + (m.result === 'draw') + '">平手' +
-           (g.draw ? '<b class="gn">×' + g.draw + '</b>' : '') + '</button>' +
-           side(st, m, 'b', rm, bo, g);
-      /* 退一局只在真的有東西可以退的時候出現 —— 空著的按鈕只會讓人以為壞了。
-         一勝制不需要它：再點同一邊就是取消。 */
-      if (bo > 1 && (g.a + g.b + g.draw) > 0) {
-        h += '<button class="undo" data-t="' + esc(m.table) + '" title="退掉最後一局">⌫<i>退一局</i></button>';
-      }
-    }
-    return h + '</div>';
-  }).join('');
+  patch(el('matchList'), V.matchListHTML(st, view, recMap(st), net.role === 'watch' ? meId : ''));
 }
 
-/* 小局進度用點點表示，點滿就是拿下這一場。畫「要贏幾局」個點，
-   而不是「總共打幾局」—— 現場關心的是還差幾局，不是還剩幾局。 */
-function pipsOf(bo, won) {
-  if (bo <= 1) return '';
-  var need = E.winsNeeded(bo), s = '';
-  for (var i = 0; i < need; i++) s += '<i' + (i < won ? ' class="on"' : '') + '></i>';
-  return '<span class="pips">' + s + '</span>';
-}
-
-/* 真的用 <button>，不是長得像按鈕的 div ——
-   div 的 Tab 停不進去、螢幕閱讀器也不會唸出「這是可以按的」，
-   等於整個回報流程對鍵盤使用者不存在。
-   aria-pressed 讓輔助技術唸得出「已選取」，那是這個介面唯一的狀態。 */
-function side(st, m, which, rm, bo, g) {
-  var id = which === 'a' ? m.a : m.b;
-  var cls = 'sd';
-  var won = (m.result === which);
-  if (won) cls += ' win';
-  else if (m.result && m.result !== 'draw' && m.result !== 'bye') cls += ' lose';
-  var r = rm && rm[id];
-  var label = '第 ' + m.table + ' 桌　' + nameOf(st, id) +
-              ((bo || 1) > 1 ? '　記他贏一局' : '　記他贏');
-  return '<button type="button" class="' + cls + '" data-t="' + esc(m.table) +
-         '" data-r="' + which + '" data-id="' + esc(id) + '" aria-pressed="' + won + '"' +
-         ' aria-label="' + esc(label) + '">' +
-         '<i>' + numOf(st, id) + '</i><span class="who">' + esc(nameOf(st, id)) + '</span>' +
-         pipsOf(bo || 1, which === 'a' ? g.a : g.b) +
-         (r ? '<span class="rec num">' + r.rec + '</span>' : '') + '</button>';
-}
-
-/* 排名表 */
+/* 排名表：要畫什麼在 view.js 的 rankView，這裡只讀搜尋框、放上畫面 */
 function paintRank(st) {
-  if (!st.players.length) { el('rankView').innerHTML =
-    '<div class="hint">還沒有名單。</div>'; return; }
-
-  /* 分組賽的名次一定要分組看。把各組混在一起排，數字就沒有意義了 ——
-     A 組第 1 跟 B 組第 1 打的是完全不同的一批人，積分不可比。 */
-  var gids = E.groupIds(st.config);
-  if (gids.length >= 2 && st.players.some(function (p) { return p.group; })) {
-    el('rankView').innerHTML = gids.map(function (g) {
-      var gp = E.inGroup(st.players, g);
-      if (!gp.length) return '';
-      var gm = E.groupMatches(st.matches, gp.map(function (p) { return p.id; }));
-      return '<h3 class="grp">' + g + ' 組　<span>' + gp.length + ' 人</span></h3>' +
-             rankTable(st, gp, gm);
-    }).join('');
-    var per = Math.max(1, Math.floor((st.config.cut || 0) / gids.length));
-    el('rankTitle').textContent = st.config.cut
-      ? '分組名次 · 各組前 ' + per + ' 名晉級' : '分組名次';
-    return;
-  }
-  el('rankView').innerHTML = rankTable(st, st.players, st.matches);
+  var v = V.rankView(st, norm(el('rankFind').value), el('rankFind').value);
+  patch(el('rankView'), v.html);
+  if (v.title !== null) el('rankTitle').textContent = v.title;
 }
 
-function rankTable(st, players, matches) {
-  var rows = E.standings(players, matches, st.config.rules);
-  var live = rows.filter(function (r) { return !r.dropped; });
-  var cut = st.config.cut || 0;
-  el('rankTitle').textContent = cut ? '即時名次 · 前 ' + cut + ' 名晉級' : '即時名次';
-
-  /* 搜尋只藏列，名次照原本算 —— 篩出來的那個人旁邊還是他真正的名次，
-     不會因為只剩他一列就變成第 1 名。 */
-  var q = norm(el('rankFind').value);
-  var shown = q ? rows.filter(function (r) {
-    return norm(r.name).indexOf(q) >= 0 || String(r.no) === q;
-  }) : rows;
-  if (q && !shown.length) {
-    return '<div class="hint">找不到「' + esc(el('rankFind').value.trim()) +
-           '」。這一份名單上共 ' + rows.length + ' 人。</div>';
-  }
-
-  var h = '<table class="rank"><thead><tr><th>#</th><th class="l">選手</th>' +
-          '<th>戰績</th><th>積分</th><th>OMW%</th><th>OOMW%</th><th></th></tr></thead><tbody>';
-  /* 前四名另外標 —— 那是有獎的名次，跟「晉級線」是兩件事，
-     所以就算沒有設定晉級人數也要看得出來。 */
-  var played = rows.some(function (r) { return r.played > 0; });
-  shown.forEach(function (r) {
-    var idx = live.indexOf(r);
-    var inCut = cut && !r.dropped && idx > -1 && idx < cut;
-    var podium = played && !r.dropped && idx > -1 && idx < 4;
-    h += '<tr class="' + (inCut ? 'cut ' : '') + (cut && idx === cut - 1 ? 'cutline ' : '') +
-         (podium ? 'top4 ' : '') + (r.dropped ? 'out' : '') + '">' +
-         '<td class="rk">' + r.rank + '</td>' +
-         '<td class="l"><div class="nmcell"><i>' + r.no + '</i>' + esc(r.name) +
-           (r.byes ? ' <span style="color:var(--dim);font-size:12px">輪空' + r.byes + '</span>' : '') +
-         '</div>' +
-         /* 手機上右邊兩欄放不下，同一組數字改掛在名字底下 ——
-            同分的時候，看的人要能自己看出憑什麼是這個順序。 */
-         (played ? '<div class="tbk">OMW ' + (r.omw * 100).toFixed(1) +
-                   '%　OOMW ' + (r.oomw * 100).toFixed(1) + '%</div>' : '') +
-         '</td>' +
-         '<td>' + r.w + '-' + r.l + (r.d ? '-' + r.d : '') + '</td>' +
-         '<td class="pt">' + r.pts + '</td>' +
-         '<td>' + (r.omw * 100).toFixed(1) + '</td>' +
-         '<td>' + (r.oomw * 100).toFixed(1) + '</td>' +
-         '<td><button class="dropb' + (r.dropped ? ' on' : '') + '" data-id="' + r.id + '">' +
-           (r.dropped ? '已退賽' : '退賽') + '</button></td></tr>';
-  });
-  return h + '</tbody></table>';
-}
-
-/* 投影 */
+/* 投影：要寫什麼、字多大在 present.js；這裡量視窗、讀時鐘、放上畫面 */
 function paintPresent(st) {
   var r = currentRound(st);
-  el('pvTag').textContent = r === null ? '—'
-    : (typeof r === 'number' ? 'R' + r : r.replace('賽', ''));
+  el('pvTag').textContent = Pv.tagText(r);
   el('pvName').textContent = st.event.name || 'NICEPLAY';
   el('pvSub').textContent = r === null ? '尚未開始' : roundLabel(r);
 
   var ms = r === null ? [] : matchesOf(st, r);
-  var playable = ms.filter(function (m) { return m.b !== null; });
-  var done = playable.filter(function (m) { return m.result; }).length;
-  el('pvFoot').textContent = r === null ? ''
-    : (roundLabel(r) + '　已回報 ' + done + '/' + playable.length +
-       (done < playable.length ? '　·　尚有 ' + (playable.length - done) + ' 桌未回報' : '　·　全部回報完畢'));
+  el('pvFoot').textContent = Pv.footText(r, ms);
 
   if (pvMode === 'plan') paintPvPlan(st, r);
-  else if (pvMode === 'rank' || r === null) paintPvRank(st);
-  else paintPvMatches(st, ms);
+  else if (pvMode === 'rank' || r === null) el('pvBody').innerHTML = Pv.rankHTML(st, pvVH());
+  else el('pvBody').innerHTML = Pv.matchesHTML(st, ms, pvVH());
 }
 
-/* ── 投影：賽程總覽 ───────────────────────────────────
-   選手第三常問的是「還要打多久」。開場與換輪的空檔投這一頁，
-   等於自動回答，主辦不用一直被同一句話打斷。
+/* 視窗高度換算成 vw —— 投影的字級全部用 vw，欄數要拿同一個單位來比 */
+function pvVH() {
+  return 100 * (window.innerHeight || 900) / (window.innerWidth || 1600);
+}
 
-   預計結束時間是「參考值」不是「狀態」—— 換輪永遠是主辦按下去才發生，
-   這個數字不會去推動任何東西，只是照現在的設定算給大家看。
-   所以標題直接寫「預計」，而且時間到了也不會自己往下跑。 */
+/* 賽程總覽。還沒開房間就沒有選手查詢網址，也就沒有 QR 要畫 */
 function paintPvPlan(st, r) {
-  var cfg = st.config;
-  var total = cfg.format === 'swiss' ? cfg.rounds : 0;
-  var doneR = E.countRounds(st.matches);
-  var nowR = (typeof r === 'number') ? r : doneR;
-  var left = total ? Math.max(0, total - nowR) : 0;
-  var alivePlayers = st.players.filter(function (p) { return !p.dropped; }).length;
-
-  var mins = cfg.minutes || 0;
-  var remainNow = Math.max(0, Math.ceil(remainMs(st) / 60000));
-  var eta = '';
-  if (mins && total) {
-    /* 這一輪剩下的 + 之後每一輪，各多留五分鐘給回報與換位 */
-    var totalMin = remainNow + left * (mins + 5);
-    var d = new Date(Date.now() + totalMin * 60000);
-    eta = pad(d.getHours()) + ':' + pad(d.getMinutes());
-  }
-
-  var cells = [
-    ['ROUND', total ? nowR + ' / ' + total : String(nowR || '—'), total ? '第幾輪' : '輪次'],
-    ['PLAYERS', String(alivePlayers), '目前人數'],
-    ['CLOCK', mins ? mins + ' 分' : '不計時', '每輪時間'],
-    ['ETA', eta || '—', eta ? '預計結束（參考）' : '未設定時間']
-  ];
-
   var url = roomViewURL(st);
-  var h = '<div class="pv-plan">' +
-    '<div class="pv-plan-hd">' +
-      '<b>' + esc(st.event.name || 'NICEPLAY') + '</b>' +
-      (st.event.host ? '<span>主辦　' + esc(st.event.host) + '</span>' : '') +
-      '<em>' + esc(formatLabel(cfg)) + '</em>' +
-    '</div>' +
-    '<div class="pv-plan-grid">' +
-      cells.map(function (c) {
-        return '<div class="pv-cell"><i>' + c[0] + '</i><b>' + esc(c[1]) +
-               '</b><span>' + esc(c[2]) + '</span></div>';
-      }).join('') +
-    '</div>';
-
-  if (url) {
-    h += '<div class="pv-plan-qr"><div class="pv-plan-qrimg">' + qrSVG(url, 420) + '</div>' +
-         '<div class="pv-plan-qrcap"><b>掃我查自己的桌號與名次</b>' +
-         '<span>不用註冊、不用安裝，掃了就看得到</span></div></div>';
-  }
-  el('pvBody').innerHTML = h + '</div>';
-}
-
-function paintPvMatches(st, ms) {
-  var n = ms.length;
-
-  /* 欄數不用公式猜 —— 1 到 6 欄各試一次，挑「字能最大」的那個。
-     一張卡橫向要放：桌號圈 + 編號籤 + 名字 + 勝 + 戰績 + 間距 ≈ 13.5 個字寬；
-     縱向要放：兩行 + VS + 內距 ≈ 3.5 個字高。
-     單位統一用 vw，所以先把視窗高度換算成 vw。                        */
-  var vh = 100 * (window.innerHeight || 900) / (window.innerWidth || 1600);
-  var best = { f: 0, cols: 1, rows: n };
-  for (var c = 1; c <= Math.min(6, n); c++) {
-    var rN = Math.ceil(n / c);
-    var cw = 100 / c, ch = (vh * 0.74) / rN;
-    var fit = Math.min(cw / 13.5, ch / 3.5);
-    if (fit > best.f) best = { f: fit, cols: c, rows: rN };
-  }
-  var cols = best.cols, rowsN = best.rows;
-  var f = Math.max(0.75, Math.min(3.4, best.f));
-
-  var rank = {};
-  E.standings(st.players, st.matches, st.config.rules).forEach(function (x) {
-    rank[x.id] = x.w + '-' + x.l + (x.d ? '-' + x.d : '');
+  el('pvBody').innerHTML = Pv.planHTML(st, r, {
+    now: Date.now(), remainMs: remainMs(st), url: url, qr: url ? qrSVG(url, 420) : ''
   });
-
-  var h = '<div class="pv-grid" style="grid-template-columns:repeat(' + cols +
-          ',1fr);grid-template-rows:repeat(' + rowsN + ',1fr)">';
-  ms.forEach(function (m) {
-    var live = st.config.liveTable && m.table === st.config.liveTable;
-    h += '<div class="pv-seat' + (live ? ' live' : '') +
-         '" style="padding:' + (f * .3) + 'vw ' + (f * .55) + 'vw;gap:' + (f * .5) + 'vw">' +
-         '<div class="pv-no" style="width:' + (f * 2.05) + 'vw;height:' + (f * 2.05) +
-         'vw;font-size:' + (f * 1.25) + 'vw">' + esc(m.table) + '</div><div class="pv-who">';
-    h += pvLine(st, m, 'a', f, rank);
-    if (m.b === null || m.b === undefined) {
-      h += '<div class="pv-vs" style="font-size:' + (f * .5) + 'vw">BYE</div>' +
-           '<div class="pv-p pv-empty" style="font-size:' + (f * .92) + 'vw">輪空 · 視同勝</div>';
-    } else {
-      h += '<div class="pv-vs" style="font-size:' + (f * .5) + 'vw">VS</div>' +
-           pvLine(st, m, 'b', f, rank);
-    }
-    h += '</div></div>';
-  });
-  el('pvBody').innerHTML = h + '</div>';
-}
-function pvLine(st, m, which, f, rank) {
-  var id = which === 'a' ? m.a : m.b;
-  var cls = 'pv-p ' + which;
-  var tag = '';
-  if (m.result === which) {
-    cls += ' win';
-    tag = '<b class="adv" style="font-size:' + (f * .54) + 'vw">勝</b>';
-  } else if (m.result && m.result !== 'draw' && m.result !== 'bye') {
-    cls += ' lose';
-  }
-  /* BO 制的投影用數字而不是點點 —— 場地最後一排看不清楚兩個點的差別 */
-  var bo = m.bo || 1, gm = '';
-  if (bo > 1) {
-    var g = E.tallyGames(E.gamesOf(m));
-    gm = '<b class="gm" style="font-size:' + (f * .72) + 'vw">' +
-         (which === 'a' ? g.a : g.b) + '</b>';
-  }
-  return '<div class="' + cls + '" style="font-size:' + f + 'vw">' +
-         '<i style="font-size:' + (f * .74) + 'vw">' + numOf(st, id) + '</i>' +
-         '<span class="nm2">' + esc(nameOf(st, id)) + '</span>' + gm + tag +
-         '<span class="rec" style="font-size:' + (f * .6) + 'vw">' + (rank[id] || '') + '</span></div>';
-}
-
-/* 名次投影是頒獎跟散場前最後一個畫面，所以：
-     · 全部的人都要上得去。切到前 16 名，第 17 名以後的人看不到自己。
-     · 前四名要一眼認得出來 —— 那是有獎的名次。
-   欄數跟對戰表一樣用試的：一到四欄各算一次，挑「字能最大」的那個。
-   一列橫向大約放得下 20 個字寬（名次 + 編號 + 名字 + 戰績 + 積分）。 */
-function paintPvRank(st) {
-  var rows = E.standings(st.players, st.matches, st.config.rules);
-  var cut = st.config.cut || 0;
-  var played = rows.some(function (r) { return r.played > 0; });
-  var live = rows.filter(function (r) { return !r.dropped; });
-  var n = rows.length || 1;
-  var vh = 100 * (window.innerHeight || 900) / (window.innerWidth || 1600);
-
-  var best = { f: 0, cols: 1, rows: n };
-  for (var c = 1; c <= Math.min(4, n); c++) {
-    var rN = Math.ceil(n / c);
-    var cw = 100 / c, ch = (vh * 0.74) / rN;
-    var fit = Math.min(cw / 20, ch / 1.75);
-    if (fit > best.f) best = { f: fit, cols: c, rows: rN };
-  }
-  var f = Math.max(.5, Math.min(2.6, best.f));
-
-  var h = '<div class="pv-rank" style="grid-template-columns:repeat(' + best.cols +
-          ',1fr);grid-template-rows:repeat(' + best.rows + ',1fr)">';
-  rows.forEach(function (r) {
-    var idx = live.indexOf(r);
-    var podium = played && !r.dropped && idx > -1 && idx < 4;
-    h += '<div class="pv-rk' + (cut && played && r.rank <= cut ? ' in' : '') +
-         (podium ? ' top4' : '') + (r.dropped ? ' out' : '') +
-         '" style="padding:' + (f * .16) + 'vw ' + (f * .6) + 'vw">' +
-         '<b style="font-size:' + (f * 1.15) + 'vw;flex-basis:' + (f * 1.8) + 'vw">' + r.rank + '</b>' +
-         '<i style="font-size:' + (f * .56) + 'vw">' + r.no + '</i>' +
-         '<span style="font-size:' + f + 'vw">' + esc(r.name) + '</span>' +
-         '<em style="font-size:' + (f * .62) + 'vw">' + r.w + '-' + r.l + (r.d ? '-' + r.d : '') + '</em>' +
-         '<u style="font-size:' + (f * 1.05) + 'vw;flex-basis:' + (f * 1.9) + 'vw">' + r.pts + '</u></div>';
-  });
-  el('pvBody').innerHTML = h + '</div>';
 }
 
 /* ── 每 250ms 更新時鐘（資料變動由 Store 推）──────────── */
@@ -2126,11 +1491,7 @@ store.subscribe(function (st, remote) {
    版本章本來就蓋在每個 script 的網址上，直接讀回來就好，不必另外維護一份。 */
 function appVersion() {
   var s = document.querySelector('script[src*="ui.js"]');
-  var m = s && s.src.match(/[?&]v=(\d+)/);
-  if (!m) return '開發版';
-  var v = m[1];
-  return v.slice(0, 4) + '-' + v.slice(4, 6) + '-' + v.slice(6, 8) + ' ' +
-         v.slice(8, 10) + ':' + v.slice(10, 12);
+  return F.versionLabel(s && s.src);
 }
 el('appVer').textContent = appVersion();
 el('bookVer').textContent = appVersion();
@@ -2234,9 +1595,11 @@ document.addEventListener('keydown', function (e) {
 });
 
 /* 搜尋與排序：只改看到的東西，不動狀態，所以直接重畫就好。
-   搜尋用 input 即時反應 —— 現場是「有人站在旁邊等」的情境。 */
-el('playFind').oninput = function () { render(store.get()); };
-el('rankFind').oninput = function () { render(store.get()); };
+   搜尋用 input 即時反應 —— 現場是「有人站在旁邊等」的情境。
+   搜尋框只牽動自己那一份列表，所以每打一個字只重畫那一份，
+   不必整頁 render（QR、名單框、賽事清單都跟搜尋無關）。 */
+el('playFind').oninput = function () { paintMatches(store.get()); };
+el('rankFind').oninput = function () { paintRank(store.get()); };
 el('fSort').onchange = function () {
   try { localStorage.setItem(SORT_KEY, el('fSort').value); } catch (e) {}
   render(store.get());

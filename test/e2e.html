@@ -115,9 +115,12 @@
        '交叉種子序錯：' + rk(ko[0].a) + 'v' + rk(ko[0].b) + ' ' + rk(ko[1].a) + 'v' + rk(ko[1].b));
     say('  四強：1v4 / 2v3（第 1 與第 2 到決賽才碰頭）✓');
 
+    /* 淘汰賽預設 BO3（store.blank 的 boKO），同一邊要點兩下才算拿下這一場 */
     for (var q = 0; q < 2; q++) {
-      click(D().querySelectorAll('#matchList .mt')[q].querySelectorAll('.sd')[0]);
-      await sleep(80);
+      for (var g = 0; g < 2; g++) {
+        click(D().querySelectorAll('#matchList .mt')[q].querySelectorAll('.sd')[0]);
+        await sleep(80);
+      }
     }
     click(el('btnNext'));
     await sleep(400);
@@ -127,8 +130,11 @@
     ok(fin.length === 1, '決賽應該 1 桌，實際 ' + fin.length);
     say('  決賽 1 桌 ✓');
 
-    click(D().querySelectorAll('#matchList .mt')[0].querySelectorAll('.sd')[0]);
-    await sleep(200);
+    for (var g2 = 0; g2 < 2; g2++) {
+      click(D().querySelectorAll('#matchList .mt')[0].querySelectorAll('.sd')[0]);
+      await sleep(100);
+    }
+    await sleep(100);
     click(el('btnNext'));
     await sleep(400);
 
@@ -154,6 +160,9 @@
     say('  退賽切換正常 ✓');
 
     /* ── 投影模式 ─────────────────────── */
+    /* 「放大投影」現在是開新視窗；這裡要驗的是同一頁放大的那條路，
+       所以讓 window.open 回 null，走「新視窗被擋掉」的退路 */
+    W().open = function () { return null; };
     click(el('btnPresent'));
     await sleep(300);
     ok(D().body.classList.contains('present'), '沒有進入投影模式');
