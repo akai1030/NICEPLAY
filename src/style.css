@@ -115,11 +115,26 @@ body { display: flex; flex-direction: column; }
 :root[data-theme="light"] .brand .mk { background-image: url(../assets/mark-light.png); }
 :root[data-theme="light"] .brand .wm { background-image: url(../assets/wordmark-light.png); }
 @media (max-width: 720px) { .brand .cn { display: none; } }
-@media (max-width: 520px) { .brand .wm { display: none; } }
 
 .evt { flex: 1; min-width: 0; font-size: 14px; color: var(--dim);
        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .clock { font-family: var(--f-mono); font-size: 15px; color: var(--dim); }
+
+/* 頂列的按鈕不准被壓扁。開房後多了連線徽章，390px 寬時「放大投影」曾被擠成直排、
+   右緣凸到 401px，整頁就能左右捲。放不下時縮的是賽事名稱與徽章（.netpill 會自己省略）。 */
+.top > button { flex: none; white-space: nowrap; }
+
+/* 手機寬度：字標、中文全名、時鐘收起來（手機狀態列本來就有時間），
+   「放大投影 ↗」縮成「投影 ↗」、間距縮成 8px，主控開房後的徽章在 375px 寬也放得下整串。
+   收的是整個 .tx 而不只是字標：空的 .tx 還是會多吃一格 gap。
+   徽章出現時賽事名稱只剩幾 px、會露出半個字，乾脆收掉，改由徽章的 margin-left:auto
+   把徽章和按鈕推到右邊（:has 不支援的瀏覽器就只是露半個字，賽事名稱照樣撐開）。 */
+@media (max-width: 520px) {
+  .top { gap: 8px; }
+  .brand .tx, .top .clock, #btnPresent .wide { display: none; }
+  .top:has(.netpill:not([hidden])) .evt { display: none; }
+  .netpill { margin-left: auto; }
+}
 
 /* ── 分頁 ───────────────────────────────────────────── */
 .tabs { flex: 0 0 auto; display: flex; gap: 2px; background: var(--bg);
@@ -367,7 +382,8 @@ h3.grp span { font-family: var(--f-mono); font-size: 12px; font-weight: 400; col
 /* ── 連線 ───────────────────────────────────────────── */
 .netpill { font-family: var(--f-mono); font-size: 11.5px; font-weight: 700;
   letter-spacing: .12em; padding: 4px 10px; border-radius: 999px;
-  border: 1.5px solid var(--line-hard); color: var(--dim); white-space: nowrap; }
+  border: 1.5px solid var(--line-hard); color: var(--dim); white-space: nowrap;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .netpill.host  { border-color: var(--lime); color: var(--accent-fg); }
 .netpill.guest { border-color: var(--blue); color: var(--blue-soft); }
 .netpill.bad   { border-color: var(--red); color: var(--danger-fg); }

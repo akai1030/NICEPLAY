@@ -74,6 +74,29 @@
     ok(el(H, 'netPill').textContent.indexOf('主控') === 0, '沒有顯示主控狀態');
     say('  房號 ' + code + ' · 頂列顯示「' + el(H, 'netPill').textContent + '」✓');
 
+    /* 主控也可能是一支手機。390px 寬開房後頂列多了連線徽章，以前「放大投影」被擠成直排、
+       右緣凸到 401px，整頁就能左右捲。html／body 都是 overflow:hidden，
+       所以要量 body.scrollWidth 跟頂列每一格的右緣，看 documentElement 會看不出來。 */
+    /* 外層是 flex，視窗不夠寬時 iframe 會被壓窄；量的時候先不准它縮 */
+    H.style.flex = 'none'; H.style.width = '390px'; await sleep(300);
+    var vw = W(H).innerWidth, edge = 0, who = '';
+    D(H).querySelectorAll('.top > *').forEach(function (n) {
+      var r = n.getBoundingClientRect();
+      if (r.width && r.right > edge) { edge = r.right; who = n.id || n.className; }
+    });
+    ok(vw === 390, 'iframe 沒有縮到 390px：' + vw);
+    ok(D(H).body.scrollWidth <= vw, '390px 開房後整頁變成 ' + D(H).body.scrollWidth + 'px 寬');
+    ok(edge <= vw, '頂列凸出畫面：' + who + ' 右緣 ' + Math.round(edge) + 'px');
+    ok(el(H, 'btnPresent').getBoundingClientRect().height <= 48,
+       '「放大投影」被擠成直排，高 ' + Math.round(el(H, 'btnPresent').getBoundingClientRect().height) + 'px');
+    /* 徽章的字會變（+12 臺、· 斷線），再長也只能自己省略，不准撐寬整頁 */
+    var pill = el(H, 'netPill'), pillText = pill.textContent;
+    pill.textContent = '主控 ' + code + '　+12 臺 · 斷線 · 斷線 · 斷線';
+    ok(D(H).body.scrollWidth <= vw, '徽章字變長就撐寬整頁：' + D(H).body.scrollWidth + 'px');
+    pill.textContent = pillText;
+    H.style.flex = ''; H.style.width = '640px'; await sleep(300);
+    say('  390px 寬開房：頂列沒有凸出、整頁沒有變寬 ✓');
+
     /* ── 手機加入 ─────────────────────────── */
     say('\n【3】手機用房號加入');
     await load(G, '../index.html');

@@ -29,8 +29,19 @@ head('【2】桌數提示');
      '30 人 → 需要 <b>15</b> 桌，目前設定 <b>15</b> 桌：A、B、C、D、E、F、G、H …… O', '超過 8 桌只列前 8 跟最後一桌');
   eq(V.tableHintHTML(10, 3, 'custom', ['A', 'B<']),
      '10 人 → 需要 <b>5</b> 桌，目前設定 <b>3</b> 桌：A、B&lt;、3', '自訂名稱有跳脫、不夠的用數字補');
-  ok(V.tableHintHTML(200, 80, 'number', []).indexOf('…… 60') > 0, '桌名最多產 60 個');
-  console.log('  建議桌數、自訂桌名、上限 ✓');
+  /* 以前提示只產到第 60 個桌名：寫著「80 桌」，尾巴卻是 60。引擎本身沒有 60 的限制 */
+  eq(V.tableHintHTML(120, 80, 'number', []),
+     '120 人 → 需要 <b>60</b> 桌，目前設定 <b>80</b> 桌：1、2、3、4、5、6、7、8 …… 80', '設 80 桌，最後一桌要是第 80 桌');
+  ok(V.tableHintHTML(120, 80, 'letter', []).endsWith('…… CB'), '字母命名的第 80 桌是 CB');
+
+  /* 上限只有一個：Engine.MAX_TABLES，桌數欄的 max 也是它。超過的在提示裡講清楚會照上限算 */
+  const E = require('../src/engine.js');
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', 'index.html'), 'utf8');
+  eq(Number((html.match(/id="fTables"[^>]*\bmax="(\d+)"/) || [])[1]), E.MAX_TABLES, '桌數欄的 max 跟 Engine.MAX_TABLES 不一樣');
+  eq(V.tableHintHTML(600, 300, 'number', []),
+     '600 人 → 需要 <b>300</b> 桌，目前設定 <b>256</b> 桌：1、2、3、4、5、6、7、8 …… 256' +
+     '。桌數最多 <b>256</b>，填 300 會照 256 算', '超過上限：照上限算，而且要講');
+  console.log('  建議桌數、自訂桌名、80 桌產到第 80 個、上限 ✓');
 }
 
 head('【3】賽事清單');
